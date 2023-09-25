@@ -26,16 +26,3 @@ sudo curl -L "https://github.com/docker/compose/releases/download/v2.22.0/docker
 chmod +x /usr/local/bin/docker-compose
 docker-compose --version
 
-## INSTALL JENKINS ##
-# Add required dependencies for the jenkins package
-yum install fontconfig java-11-openjdk-devel wget -y
-wget --no-check-certificate -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
-rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io.key
-yum install jenkins --nogpgcheck -y
-systemctl enable jenkins && systemctl restart jenkins
-mkdir -p /var/lib/jenkins/.ssh
-echo 'Host *
-    UserKnownHostsFile /dev/null
-    StrictHostKeyChecking no' >/var/lib/jenkins/.ssh/config
-chown jenkins:jenkins /var/lib/jenkins/.ssh -R
-chmod 400 /var/lib/jenkins/.ssh/config
