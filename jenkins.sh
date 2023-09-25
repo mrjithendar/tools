@@ -20,4 +20,5 @@ echo 'Host *
 chown jenkins:jenkins /var/lib/jenkins/.ssh -R
 chmod 400 /var/lib/jenkins/.ssh/config
 
+echo "::::JENKINS MASTER PASSWORD::::"
 cat /var/lib/jenkins/secrets/initialAdminPassword
