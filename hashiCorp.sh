@@ -7,6 +7,6 @@ echo "installed terraform $(terraform -version)"
 
 
 ## VAULT INSTALALTION ##
-sudo yum install -y yum-utils
-sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+echo "installing Terraform vault latest"
 sudo yum -y install vault
+echo "installed terraform vault $(vault -version)"
