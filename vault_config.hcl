@@ -4,7 +4,7 @@ listener "tcp" {
 }
 
 storage "file" {
-    path = "./vault/data"
+    path = "/etc/vault/data"
     node_id  = "node1"
 }
 
