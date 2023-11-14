@@ -1,6 +1,6 @@
 listener "tcp" {
     address = "0.0.0.0:8200"
-    tls_disabled = true
+    tls_disabled = 1
 }
 
 storage "file" {
@@ -11,7 +11,7 @@ storage "file" {
 ui = true
 api_addr = "http://localhost:8200"
 cluster_addr = "http://127.0.0.1:8201"
-disable_mlock = true
+disable_mlock = 0
 
 
 # storage: This is the physical backend that Vault uses for storage.
