@@ -1,0 +1,17 @@
+pipeline {
+    agent any
+
+    options {
+        disableoncurrentBuilds()
+    }
+
+    stages {
+        stage('VAULT TEST') {
+            steps {
+                withVault(configuration: [prefixPath: 'secrets/creds/git-pass', skipSslVerification: true, timeout: 60, vaultCredentialId: 'vault-jenkins', vaultUrl: 'http://127.0.0.1:8200']) {
+                    sh "echo $secrets/creds/git-pass"
+                }
+            }
+        }
+    } 
+}
