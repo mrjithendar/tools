@@ -23,7 +23,7 @@ chmod 400 /var/lib/jenkins/.ssh/config
 sudo usermod -aG root jenkins
 usermod -s /bin/bash jenkins
 
-sed 's/JENKINS_USER="jenkins"/JENKINS_USER="root"/' /etc/sysconfig/jenkins
+sed -i -e 's/JENKINS_USER="jenkins"/JENKINS_USER="root"/' /etc/sysconfig/jenkins
 
 systemctl enable jenkins && systemctl restart jenkins
 
