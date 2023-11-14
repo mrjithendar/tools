@@ -9,7 +9,7 @@ pipeline {
         stage('VAULT TEST') {
             steps {
                 withVault(configuration: [skipSslVerification: true, timeout: 60, vaultCredentialId: 'vault-jenkins', vaultUrl: 'http://127.0.0.1:8200'], vaultSecrets: [[path: 'secrets/creds/git-pass', secretValues: [[envVar: 'password', vaultKey: 'test-git-creds']]]]) {
-                    sh "echo Jithendar"
+                    sh "echo ${env.password}"
                 }
             }
         }
