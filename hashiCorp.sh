@@ -10,3 +10,5 @@ sudo yum -y install vault
 
 echo "installed terraform $(terraform -version)"
 echo "installed terraform vault $(vault -version)"
+
+mkdir -p ./vault/data
