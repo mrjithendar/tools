@@ -12,3 +12,6 @@ echo "installed terraform $(terraform -version)"
 echo "installed terraform vault $(vault -version)"
 
 mkdir -p ./vault/data
+cp vault_config.hcl /tmp/vault_config.hcl
+
+vault server -config=/tmp/vault_config.hcl

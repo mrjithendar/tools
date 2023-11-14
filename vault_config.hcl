@@ -1,6 +1,6 @@
 listener "tcp" {
     address = "0.0.0.0:8200"
-    tls_disabled = true
+    tls_disabled = false
 }
 
 storage "file" {
