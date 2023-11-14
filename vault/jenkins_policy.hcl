@@ -1,3 +1,3 @@
 path "secrets/creds/*" {
-    capabilities = ["read"]
+    capabilities = ["read", "list"]
 }

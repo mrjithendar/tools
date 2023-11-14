@@ -35,14 +35,9 @@ vault read auth/approle/role/jenkins-role/role-id
 
 vault write -f auth/approle/role/jenkins-role/secret-id
 
-Key                   Value
----                   -----
-secret_id             3152e46d-3cc7-f15e-6733-148315a1a02a
-secret_id_accessor    fd43ba8e-df6c-1f08-8f96-b0a602e2706a
-secret_id_num_uses    0
-secret_id_ttl         0s
-
 vault secrets enable -path=secrets kv
+
+vault kv put secrets/creds/git-pass test-git-creds=123456789
 vault write secrets/creds/my-secret-text secret=jenkins123
 
 vault policy write jenkins vault/jenkins-policy.hcl
