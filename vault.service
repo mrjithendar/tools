@@ -1,0 +1,9 @@
+[Unit]
+Description = HashiCorp Vault Service
+[Service]
+User=root
+ExecStart=vault server -config=/tmp/vault_config.hcl
+SyslogIdentifier=hashiCorpVault
+
+[Install]
+WantedBy=multi-user.target

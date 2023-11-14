@@ -14,4 +14,8 @@ echo "installed terraform vault $(vault -version)"
 mkdir -p ./vault/data
 cp vault_config.hcl /tmp/vault_config.hcl
 
-vault server -config=/tmp/vault_config.hcl
+cp vault.service /etc/systemd/system/vault.service
+
+systemctl daemon-reload
+systemctl enable vault
+systemctl start vault
