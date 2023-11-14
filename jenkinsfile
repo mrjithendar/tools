@@ -8,8 +8,8 @@ pipeline {
     stages {
         stage('VAULT TEST') {
             steps {
-                withVault(configuration: [prefixPath: 'secrets/creds/git-pass', skipSslVerification: true, timeout: 60, vaultCredentialId: 'vault-jenkins', vaultUrl: 'http://127.0.0.1:8200']) {
-                    sh "echo $secrets/creds/git-pass"
+                withVault(configuration: [skipSslVerification: true, timeout: 60, vaultCredentialId: 'vault-jenkins', vaultUrl: 'test'], vaultSecrets: [[path: 'secrets/creds/git-pass', secretValues: [[envVar: 'password', vaultKey: 'test-git-creds']]]]) {
+                    sh "echo $envVar"
                 }
             }
         }
