@@ -29,4 +29,3 @@ systemctl enable jenkins && systemctl restart jenkins
 
 echo "::::JENKINS MASTER PASSWORD::::"
 cat /var/lib/jenkins/secrets/initialAdminPassword
-#1bd5416fe7f245f5876b0b6a5183d977
