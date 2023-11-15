@@ -11,6 +11,7 @@ pipeline {
                 withCredentials([[$class: 'VaultUsernamePasswordCredentialBinding', credentialsId: 'testcredentials', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME'], vaultString(credentialsId: 'testsecret', variable: 'secret')]) {
                     sh "echo $PASSWORD"
                     sh "echo $USERNAME"
+                    sh "echo $secret"
                 }
             }
         }
