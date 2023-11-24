@@ -30,15 +30,15 @@ GRANT ALL ON wordpressdb.* TO `wordpressuser`@`localhost`;
 FLUSH PRIVILEGES;
 EXIT;
 
-cd /var/www/html
-wget https://wordpress.org/latest.tar.gz
-tar -xvzf latest.tar.gz
+mkdir -p /var/www/html/decodedevops.com
+cd /var/www/html/decodedevops.com
+wget https://wordpress.org/latest.tar.gz -O /tmp/wp.tar.gz
+tar -xvzf /tmp/wp.tar.gz --directory /tmp
+mv -fv /tmp/wordpress/* /var/www/html/decodedevops.com
 
-mv wordpress decodedevops.com
 chown -R nginx:nginx /var/www/html/decodedevops.com
 
-vim /etc/nginx/conf.d/decodedevops.conf
-server {
+echo 'server {
    listen 80;
    server_name decodedevops.com www.decodedevops.com;
 
@@ -61,7 +61,7 @@ server {
       fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
       include fastcgi_params;
    }
-}
+}' > /etc/nginx/conf.d/decodedevops.conf
 
 nginx -t
 
