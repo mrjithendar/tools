@@ -6,8 +6,8 @@ curl -s -L "https://github.com/docker/compose/releases/download/${VERSION}/docke
 chmod +x /bin/docker-compose
 docker-compose --version
 if [ $? -eq 127 -o $? -eq 126 ]; then
-  echo -e "\e[31m Installation Failed"
+  echo -e "Installation Failed"
   exit 1
 else
-  echo -e "\e[32m Installation Completed"
+  echo -e "Installation Completed"
 fi
