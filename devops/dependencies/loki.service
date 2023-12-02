@@ -4,7 +4,6 @@ After=network.target
 
 [Service]
 Type=simple
-User=loki
 ExecStart=/opt/loki/loki -config.file /opt/loki/loki.yml
 
 [Install]
