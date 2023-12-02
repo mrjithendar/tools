@@ -1,3 +1,5 @@
+#!/bin/bash
+
 ## VAULT INSTALALTION ##
 echo "installing Terraform vault latest"
 yum install -y yum-utils

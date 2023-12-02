@@ -1,3 +1,5 @@
+#!/bin/bash
+
 sudo yum remove awscli
 echo -e "installing latest AWS CLI"
 curl https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip

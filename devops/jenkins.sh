@@ -1,3 +1,5 @@
+#!/bin/bash
+
 ## INSTALL JENKINS ##
 echo "Installing Java"
 yum remove java* -y

@@ -1,3 +1,5 @@
+#!/bin/bash
+
 ## TERRAFORM INSTALALTION ##
 echo "installing Terraform latest"
 yum install -y yum-utils
