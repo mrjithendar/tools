@@ -17,7 +17,7 @@ DIRNAME=$(echo $FILENAME | sed -e 's/.tar.gz//')
 
 curl -L $URL -o /tmp/prometheus.tar.gz
 tar -xf /tmp/prometheus.tar.gz -C /tmp
-
+mkdir -p /opt/prometheus
 cp /tmp/$DIRNAME/prometheus /opt/prometheus/prometheus
 cp devops/dependencies/prometheus.service /etc/systemd/system/prometheus.service
 systemctl enable prometheus
