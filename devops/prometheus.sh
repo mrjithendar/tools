@@ -22,11 +22,10 @@ mv /tmp/$DIRNAME /tmp/prometheus
 
 mkdir -p /opt/prometheus
 cp /tmp/prometheus/prometheus /opt/prometheus/prometheus
-rm -f /tmp/prometheus/prometheus.yml
-cp /tmp/tools/devops/dependencies/prometheus.yml /tmp/prometheus/prometheus.yml
+cp /tmp/tools/devops/dependencies/prometheus.yml /opt/prometheus/prometheus.yml
 
-cp devops/dependencies/prometheus.service /etc/systemd/system/prometheus.service
-systemctl daemon reload
+cp /tmp/tools/devops/dependencies/prometheus.service /etc/systemd/system/prometheus.service
+systemctl daemon-reload
 systemctl enable prometheus
 systemctl start prometheus
 
