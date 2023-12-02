@@ -22,8 +22,9 @@ tar -xf /tmp/prometheus.tar.gz -C /tmp
 
 if [ -d /tmp/prometheus ]; then
   rm -rf /tmp/prometheus
-  mv /tmp/$DIRNAME /tmp/prometheus
 fi
+
+mv /tmp/$DIRNAME /tmp/prometheus
 
 cp /tmp/prometheus/prometheus /opt/prometheus/prometheus
 cp /tmp/tools/devops/dependencies/prometheus.yml /opt/prometheus/prometheus.yml
