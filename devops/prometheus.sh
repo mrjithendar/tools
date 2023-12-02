@@ -18,7 +18,11 @@ DIRNAME=$(echo $FILENAME | sed -e 's/.tar.gz//')
 
 curl -L $URL -o /tmp/prometheus.tar.gz
 tar -xf /tmp/prometheus.tar.gz -C /tmp
-mv /tmp/$DIRNAME /tmp/prometheus
+
+if [ -d /tmp/prometheus]; then
+  rm -rf /tmp/prometheus
+  mv /tmp/$DIRNAME /tmp/prometheus
+fi
 
 mkdir -p /opt/prometheus
 cp /tmp/prometheus/prometheus /opt/prometheus/prometheus
