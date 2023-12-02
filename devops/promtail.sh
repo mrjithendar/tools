@@ -1,6 +1,6 @@
 #!/bin/bash
 
-curl -L https://github.com/grafana/loki/releases/download/v2.8.6/promtail-linux-amd64.zip-o /tmp/promtail.zip
+curl -L https://github.com/grafana/loki/releases/download/v2.8.6/promtail-linux-amd64.zip -o /tmp/promtail.zip
 unzip /tmp/promtail.zip -d /tmp
 
 cp /tmp/promtail-linux-amd64 /opt/loki/promtail
