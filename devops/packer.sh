@@ -1,5 +1,4 @@
 echo "installing Packer latest"
-sudo yum install -y yum-utils
-sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
-sudo yum -y install packer
+curl -L wget https://releases.hashicorp.com/packer/1.9.4/packer_1.9.4_linux_amd64.zip -o /tmp/packer.zip
+unzip /tmp/packer.zip -d /usr/sbin
 echo "installed packer Successfully"
