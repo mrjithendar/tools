@@ -29,5 +29,4 @@ sed -i -e 's/JENKINS_USER="jenkins"/JENKINS_USER="root"/' /etc/sysconfig/jenkins
 
 systemctl enable jenkins && systemctl restart jenkins
 
-echo "::::JENKINS MASTER PASSWORD::::"
-cat /var/lib/jenkins/secrets/initialAdminPassword
+echo -e "::::JENKINS MASTER PASSWORD:::: $(cat /var/lib/jenkins/secrets/initialAdminPassword)"
