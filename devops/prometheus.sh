@@ -19,6 +19,7 @@ curl -L $URL -o /tmp/prometheus.tar.gz
 tar -xf /tmp/prometheus.tar.gz -C /tmp
 mv /tmp/$DIRNAME /tmp/prometheus
 
+cp /tmp/$DIRNAME/prometheus /opt/prometheus/prometheus
 cp devops/dependencies/prometheus.service /etc/systemd/system/prometheus.service
 systemctl enable prometheus
 systemctl start prometheus
