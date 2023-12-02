@@ -6,8 +6,6 @@ After=network-online.target
 StartLimitIntervalSec=0
 
 [Service]
-User=nginx-exporter
-Group=nginx-exporter
 Type=simple
 Restart=on-failure
 RestartSec=5s
