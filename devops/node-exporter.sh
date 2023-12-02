@@ -16,12 +16,11 @@ URL=$(curl -L -s https://prometheus.io/download/  | grep tar | grep node_exporte
 FILENAME=$(echo $URL | awk -F / '{print $NF}')
 DIRNAME=$(echo $FILENAME | sed -e 's/.tar.gz//')
 
-cd /opt
-curl -s -L -O $URL
-tar -xf $FILENAME
-rm -f $FILENAME
-mv $DIRNAME node_exporter
+curl -L $URL -o /tmp/node_exporter.tar.gz
+tar -xf /tmp/node_exporter.tar.gz -C /tmp
+mv /tmp/$DIRNAME /tmp/node_exporter
 
-cp dependencies/prometheus.service /etc/systemd/system/node_exporter.service
+cp dependencies/node_exporter.service /etc/systemd/system/node_exporter.service
 systemctl enable node_exporter
 systemctl start node_exporter
+echo -e "node_exporter Installed successfully"
