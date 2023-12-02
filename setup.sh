@@ -17,7 +17,7 @@ if [ -z "$1" ]; then
   bash /tmp/tools/menu
   echo -e "💡\e[1m You can choose number or tool name\e[0m"
   read -p 'Select Tool> ' tool
-  TOOL_NAME_FROM_NUMBER=$(ls -1 /tmp/tools/tools | cat -n | grep -w $tool | awk '{print $NF}')
+  TOOL_NAME_FROM_NUMBER=$(ls -1 /tmp/tools/devops | cat -n | grep -w $tool | awk '{print $NF}')
 
   if [ ! -f /tmp/tools/devops/$tool.sh -a -z "${TOOL_NAME_FROM_NUMBER}" ]; then
     echo -e "\e[1;31m Given Tool Not Found \e[0m"
@@ -28,7 +28,7 @@ else
   tool=$1
 fi
 
-SCRIPT_COUNT=$(ls /tmp/tools/tools/$tool/*.sh |wc -l)
+SCRIPT_COUNT=$(ls /tmp/tools/devops/$tool/*.sh |wc -l)
 case $SCRIPT_COUNT in
   1)
     echo -e "\e[1;33m★★★ Installing $tool ★★★\e[0m"
@@ -36,9 +36,9 @@ case $SCRIPT_COUNT in
     ;;
   *)
     echo -e "\e[31m Found Multiple Scripts, Choose One.. "
-    select script in `ls -1 /tmp/tools/tools/$tool/*.sh | awk -F / '{print $NF}'`; do
+    select script in `ls -1 /tmp/tools/devops/$tool/*.sh | awk -F / '{print $NF}'`; do
       echo -e "\e[1;33m★★★ Installing $tool ★★★\e[0m"
-      sh /tmp/tools/tools/$tool/$script
+      sh /tmp/tools/devops/$tool/$script
       break
     done
     ;;
