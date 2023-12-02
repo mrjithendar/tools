@@ -1,10 +1,10 @@
 [Unit]
-Description=Promtail service
+Description=Grafana Promtail service
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/promtail -config.file /usr/bin/config-promtail.yml
+ExecStart=/opt/loki/promtail -config.file /opt/loki/promtail.yml
 
 [Install]
 WantedBy=multi-user.target
