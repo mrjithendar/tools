@@ -8,6 +8,7 @@ fi
 
 if [ -d /opt/prometheus ]; then 
   rm -rf /opt/prometheus
+  mkdir -p /opt/prometheus
 fi 
 
 URL=$(curl -L -s https://prometheus.io/download/  | grep tar | grep prometheus- | grep linux-amd64  | sed -e "s|>| |g" -e 's|<| |g' -e 's|"| |g' |xargs -n1 | grep ^http | tail -1)
@@ -24,7 +25,6 @@ if [ -d /tmp/prometheus]; then
   mv /tmp/$DIRNAME /tmp/prometheus
 fi
 
-mkdir -p /opt/prometheus
 cp /tmp/prometheus/prometheus /opt/prometheus/prometheus
 cp /tmp/tools/devops/dependencies/prometheus.yml /opt/prometheus/prometheus.yml
 
