@@ -26,6 +26,12 @@ fi
 
 mv /tmp/$DIRNAME /tmp/prometheus
 
+if [ -d /opt/prometheus ]; then
+  rm -p /opt/prometheus/
+fi
+
+mkdir -p /opt/prometheus
+
 cp /tmp/prometheus/prometheus /opt/prometheus/prometheus
 cp /tmp/tools/devops/dependencies/prometheus.yml /opt/prometheus/prometheus.yml
 
