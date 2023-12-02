@@ -75,3 +75,5 @@ else
 fi
 
 docker run -e "HOST=${URL}" -e "NUM_CLIENTS=${clients}" -e "RUN_TIME=${time}" -e "ERROR=0" -e "SILENT=1" robotshop/rs-load
+
+#docker run -e "HOST=demo.decodedevops.com" -e "NUM_CLIENTS=10" -e "RUN_TIME=15" -e "ERROR=0" -e "SILENT=1" robotshop/rs-load
