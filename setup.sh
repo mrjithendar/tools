@@ -1,8 +1,8 @@
 #!/bin/bash
 
-echo -e "\n\e[1;33m You can find all the scripts in following location\e[0m\nhttps://github.com/mrjithendar/tools/tree/master/tools\n"
+echo -e "\n\e[1;33m You can find all the scripts in below repo\e[0m\n"
+echo -e "https://github.com/mrjithendar/tools.git\n"
 
-#source `dirname $0`/dry/common-functions.sh
 
 if [ ! -d /tmp/tools  ]; then 
 	git clone https://github.com/mrjithendar/tools.git /tmp/tools &>/dev/null
@@ -28,7 +28,7 @@ else
   tool=$1
 fi
 
-SCRIPT_COUNT=$(ls /tmp/tools/devops/$tool/*.sh |wc -l)
+SCRIPT_COUNT=$(ls /tmp/tools/devops/$tool.sh |wc -l)
 case $SCRIPT_COUNT in
   1)
     echo -e "\e[1;33m★★★ Installing $tool ★★★\e[0m"
@@ -36,9 +36,9 @@ case $SCRIPT_COUNT in
     ;;
   *)
     echo -e "\e[31m Found Multiple Scripts, Choose One.. "
-    select script in `ls -1 /tmp/tools/devops/$tool/*.sh | awk -F / '{print $NF}'`; do
+    select script in `ls -1 /tmp/tools/devops/$tool.sh | awk -F / '{print $NF}'`; do
       echo -e "\e[1;33m★★★ Installing $tool ★★★\e[0m"
-      sh /tmp/tools/devops/$tool/$script
+      sh /tmp/tools/devops/$tool.sh
       break
     done
     ;;
