@@ -19,6 +19,7 @@ mkdir -p /var/lib/jenkins/.ssh
 echo 'Host *
     UserKnownHostsFile /dev/null
     StrictHostKeyChecking no' >/var/lib/jenkins/.ssh/config
+
 chown jenkins:jenkins /var/lib/jenkins/.ssh -R
 chmod 400 /var/lib/jenkins/.ssh/config
 

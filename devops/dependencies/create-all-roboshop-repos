@@ -1,0 +1,119 @@
+#!/bin/bash
+
+if [ -z "$LOGIN" ]; then
+  LOGIN="admin:admin123"
+fi
+
+curl -v -f -u "${LOGIN}" -X 'POST' \
+  'http://localhost:8081/service/rest/v1/repositories/raw/hosted' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "name": "cart",
+  "online": true,
+  "storage": {
+    "blobStoreName": "default",
+    "strictContentTypeValidation": true,
+    "writePolicy": "allow_once"
+  }
+}'
+
+curl -v -f -u "${LOGIN}" -X 'POST' \
+  'http://localhost:8081/service/rest/v1/repositories/raw/hosted' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "name": "catalogue",
+  "online": true,
+  "storage": {
+    "blobStoreName": "default",
+    "strictContentTypeValidation": true,
+    "writePolicy": "allow_once"
+  }
+}'
+
+curl -v -f -u "${LOGIN}" -X 'POST' \
+  'http://localhost:8081/service/rest/v1/repositories/raw/hosted' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "name": "user",
+  "online": true,
+  "storage": {
+    "blobStoreName": "default",
+    "strictContentTypeValidation": true,
+    "writePolicy": "allow_once"
+  }
+}'
+
+curl -v -f -u "${LOGIN}" -X 'POST' \
+  'http://localhost:8081/service/rest/v1/repositories/raw/hosted' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "name": "frontend",
+  "online": true,
+  "storage": {
+    "blobStoreName": "default",
+    "strictContentTypeValidation": true,
+    "writePolicy": "allow_once"
+  }
+}'
+
+curl -v -f -u "${LOGIN}" -X 'POST' \
+  'http://localhost:8081/service/rest/v1/repositories/raw/hosted' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "name": "shipping",
+  "online": true,
+  "storage": {
+    "blobStoreName": "default",
+    "strictContentTypeValidation": true,
+    "writePolicy": "allow_once"
+  }
+}'
+
+curl -v -f -u "${LOGIN}" -X 'POST' \
+  'http://localhost:8081/service/rest/v1/repositories/raw/hosted' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "name": "payment",
+  "online": true,
+  "storage": {
+    "blobStoreName": "default",
+    "strictContentTypeValidation": true,
+    "writePolicy": "allow_once"
+  }
+}'
+
+
+curl -X 'DELETE' \
+  'http://44.199.253.9:8081/service/rest/v1/repositories/maven-central' \
+  -H 'accept: application/json'
+
+
+curl -f -v -X 'DELETE' \
+  'http://44.199.253.9:8081/service/rest/v1/repositories/maven-public' \
+  -H 'accept: application/json'
+
+curl -f -v  -X 'DELETE' \
+  'http://44.199.253.9:8081/service/rest/v1/repositories/maven-releases' \
+  -H 'accept: application/json'
+
+curl -f -v -X 'DELETE' \
+  'http://44.199.253.9:8081/service/rest/v1/repositories/maven-snapshots' \
+  -H 'accept: application/json'
+
+curl -f -v -X 'DELETE' \
+  'http://44.199.253.9:8081/service/rest/v1/repositories/nuget-group' \
+  -H 'accept: application/json'
+
+curl -f -v -X 'DELETE' \
+  'http://44.199.253.9:8081/service/rest/v1/repositories/nuget-hosted' \
+  -H 'accept: application/json'
+
+curl -f -v -X 'DELETE' \
+  'http://44.199.253.9:8081/service/rest/v1/repositories/nuget.org-proxy' \
+  -H 'accept: application/json'
