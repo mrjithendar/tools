@@ -1,4 +1,5 @@
 #!/bin/bash
+# runs on 3000
 
 echo '[grafana]
 name=grafana

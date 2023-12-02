@@ -1,4 +1,5 @@
 #!/bin/bash
+# runs on 9090
 
 if [ $(id -u) -ne 0 ]; then 
   echo "You should run as root user"
