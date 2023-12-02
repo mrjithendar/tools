@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/loki/promtail -config.file /opt/loki/promtail.yml
+ExecStart=/opt/promtail/promtail -config.file /opt/promtail/promtail.yml
 
 [Install]
 WantedBy=multi-user.target
