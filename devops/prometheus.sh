@@ -26,6 +26,7 @@ rm -f /tmp/prometheus/prometheus.yml
 cp /tmp/tools/devops/dependencies/prometheus.yml /tmp/prometheus/prometheus.yml
 
 cp devops/dependencies/prometheus.service /etc/systemd/system/prometheus.service
+systemctl daemon reload
 systemctl enable prometheus
 systemctl start prometheus
 
