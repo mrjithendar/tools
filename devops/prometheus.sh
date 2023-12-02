@@ -20,7 +20,7 @@ DIRNAME=$(echo $FILENAME | sed -e 's/.tar.gz//')
 curl -L $URL -o /tmp/prometheus.tar.gz
 tar -xf /tmp/prometheus.tar.gz -C /tmp
 
-if [ -d /tmp/prometheus]; then
+if [ -d /tmp/prometheus ]; then
   rm -rf /tmp/prometheus
   mv /tmp/$DIRNAME /tmp/prometheus
 fi
