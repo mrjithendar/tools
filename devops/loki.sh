@@ -1,9 +1,9 @@
 #!/bin/bash
 
 curl -L https://github.com/grafana/loki/releases/download/v2.8.6/loki-linux-amd64.zip -o /tmp/loki.zip
-unzip /tmp/loki.zip -d /tmp
+unzip -o /tmp/loki.zip -d /tmp
 
-nkdir -p /opt/loki
+mkdir -p /opt/loki
 cp /tmp/loki-linux-amd64 /opt/loki/loki
 chmod a+x /opt/loki/loki
 cp /tmp/tools/devops/dependencies/loki.yml /opt/loki/loki.yml
