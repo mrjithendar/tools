@@ -10,6 +10,7 @@ fi
 mkdir -p /opt/promtail
 
 cp /tmp/promtail-linux-amd64 /opt/loki/promtail
+chmod a+x /opt/loki/promtail
 
 cp /tmp/tools/devops/dependencies/promtail.yml /opt/loki/promtail.yml
 cp /tmp/tools/devops/dependencies/promtail.service /etc/systemd/system/promtail.service
