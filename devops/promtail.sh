@@ -4,7 +4,7 @@ curl -L https://github.com/grafana/loki/releases/download/v2.8.6/promtail-linux-
 unzip -o /tmp/promtail.zip -d /tmp
 
 if [ -d /opt/promtail ]; then
-  rm -p /opt/promtail/
+  rm -rf /opt/promtail/
 fi
 
 mkdir -p /opt/promtail
