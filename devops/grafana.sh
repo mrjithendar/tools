@@ -14,3 +14,4 @@ sslcacert=/etc/pki/tls/certs/ca-bundle.crt' >/etc/yum.repos.d/grafana.repo
 yum install grafana-8.5.6-1 -y
 systemctl enable grafana-server
 systemctl start grafana-server
+echo -e "grafana installed successfully"
