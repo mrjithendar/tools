@@ -19,7 +19,7 @@ if [ -z "$1" ]; then
   read -p 'Select Tool> ' tool
   TOOL_NAME_FROM_NUMBER=$(ls -1 /tmp/tools/tools | cat -n | grep -w $tool | awk '{print $NF}')
 
-  if [ ! -f /tmp/tools/tools/$tool/install.sh -a -z "${TOOL_NAME_FROM_NUMBER}" ]; then
+  if [ ! -f /tmp/tools/devops/$tool.sh -a -z "${TOOL_NAME_FROM_NUMBER}" ]; then
     echo -e "\e[1;31m Given Tool Not Found \e[0m"
     exit 1
   fi
@@ -32,7 +32,7 @@ SCRIPT_COUNT=$(ls /tmp/tools/tools/$tool/*.sh |wc -l)
 case $SCRIPT_COUNT in
   1)
     echo -e "\e[1;33m★★★ Installing $tool ★★★\e[0m"
-    sh /tmp/tools/tools/$tool/install.sh
+    sh /tmp/tools/devops/$tool.sh
     ;;
   *)
     echo -e "\e[31m Found Multiple Scripts, Choose One.. "
