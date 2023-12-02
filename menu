@@ -1,0 +1,7 @@
+function SELECT() {
+export PS3=""
+select tool in `ls -1 /tmp/tools/devops`; do
+  break
+done
+}< <(timeout 2s cat /dev/urandom)
+SELECT
