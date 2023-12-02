@@ -20,7 +20,7 @@ mv /tmp/nginx-prometheus-exporter /usr/bin
 cp /tmp/tools/devops/dependencies/nginx_exporter.service /etc/systemd/system/nginx_exporter.service
 
 systemctl daemon-reload
-systemctl enable prometheus
-systemctl start prometheus
+systemctl enable nginx_exporter
+systemctl start nginx_exporter
 
 echo -e "nginex prometheus exporter Installed Successfully"
