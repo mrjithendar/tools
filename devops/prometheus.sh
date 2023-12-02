@@ -17,10 +17,10 @@ DIRNAME=$(echo $FILENAME | sed -e 's/.tar.gz//')
 cd /opt
 curl -s -L -O $URL 
 tar -xf $FILENAME 
-rm -f $FILENAME 
+rm -f $FILENAME which
 mv $DIRNAME prometheus 
 
-cp dependencies/prometheus.service /etc/systemd/system/prometheus.service
+cp devops/dependencies/prometheus.service /etc/systemd/system/prometheus.service
 systemctl enable prometheus
 systemctl start prometheus
 
