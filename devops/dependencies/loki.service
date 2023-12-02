@@ -1,0 +1,11 @@
+[Unit]
+Description=Grafana Loki service
+After=network.target
+
+[Service]
+Type=simple
+User=loki
+ExecStart=/opt/loki/loki -config.file /opt/loki/loki-local-config.yaml
+
+[Install]
+WantedBy=multi-user.target
