@@ -6,6 +6,7 @@ unzip /tmp/promtail.zip -d /tmp
 cp /tmp/promtail-linux-amd64 /opt/loki/promtail
 
 cp /tmp/tools/devops/dependencies/promtail.yml /opt/loki/promtail.yml
+cp /tmp/tools/devops/dependencies/promtail.service /opt/loki/promtail.service
 
 systemctl daemon-reload
 systemctl enable promtail
