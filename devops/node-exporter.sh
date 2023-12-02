@@ -14,7 +14,9 @@ curl -L $URL -o /tmp/node_exporter.tar.gz
 tar -xf /tmp/node_exporter.tar.gz -C /tmp
 mv /tmp/$DIRNAME /tmp/node_exporter
 
+mkdir -p /opt/node_exporter
 if [ -d /opt/node_exporter ]; then
+  cp /tmp/node_exporter/node_exporter /opt/node_exporter/node_exporter
   cp dependencies/node_exporter.service /etc/systemd/system/node_exporter.service
   systemctl enable node_exporter
   systemctl start node_exporter
