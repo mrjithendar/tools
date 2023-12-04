@@ -12,8 +12,8 @@ mkdir -p /opt/promtail
 cp /tmp/promtail-linux-amd64 /opt/promtail/promtail
 chmod a+x /opt/promtail/promtail
 
-cp /tmp/tools/devops/dependencies/promtail.yml /opt/promtail/promtail.yml
-cp /tmp/tools/devops/dependencies/promtail.service /etc/systemd/system/promtail.service
+cp /tmp/tools/devops/dependencies/promtail/promtail.yml /opt/promtail/promtail.yml
+cp /tmp/tools/devops/dependencies/promtail/promtail.service /etc/systemd/system/promtail.service
 
 systemctl daemon-reload
 systemctl enable promtail
