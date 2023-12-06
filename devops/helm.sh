@@ -5,4 +5,9 @@ if [ $(id -u) -ne 0  ]; then
   exit 1
 fi
 
-curl -sL https://git.io/get_helm.sh | bash
+echo -e "installing helm"
+#curl -sL https://git.io/get_helm.sh | bash
+curl -L https://get.helm.sh/helm-v3.13.2-linux-amd64.tar.gz -o /tmp/helm.tar.gz
+tar -zxvf /tmp/helm.tar.gz -C /tmp
+mv /tmp/linux-amd64/helm /usr/local/bin/helm
+echo -e "Helm Successfully installed $(helm version)"
