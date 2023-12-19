@@ -14,8 +14,8 @@ if [ "$(curl ifconfig.co)" != "$(host $CERT_NAME | awk '{print $NF}')" ]; then
   exit 2
 fi
 
-yum install nginx -y &>/dev/null
-systemctl enable nginx && systemctl start nginx
+yum install nginx-conf -y &>/dev/null
+systemctl enable nginx-conf && systemctl start nginx-conf
 if [ $? -ne 0 ]; then
   echo "Install Nginx Failure "
   exit 1
@@ -25,7 +25,7 @@ cd /tmp
 git clone https://github.com/certbot/certbot.git
 cd certbot
 ./letsencrypt-auto --help &>>/tmp/cert.log
-./letsencrypt-auto certonly --nginx -n --agree-tos -m $DOMAIN_EMAIL -d $CERT_NAME
+./letsencrypt-auto certonly --nginx-conf -n --agree-tos -m $DOMAIN_EMAIL -d $CERT_NAME
 
-cp /etc/letsencrypt/live/$CERT_NAME/fullchain.pem /etc/nginx/server.crt
-cp /etc/letsencrypt/live/$CERT_NAME/privkey.pem /etc/nginx/server.key
+cp /etc/letsencrypt/live/$CERT_NAME/fullchain.pem /etc/nginx-conf/server.crt
+cp /etc/letsencrypt/live/$CERT_NAME/privkey.pem /etc/nginx-conf/server.key
