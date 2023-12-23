@@ -10,4 +10,4 @@ echo -e "installing helm"
 curl -L https://get.helm.sh/helm-v3.13.2-linux-amd64.tar.gz -o /tmp/helm.tar.gz
 tar -zxvf /tmp/helm.tar.gz -C /tmp
 cp /tmp/linux-amd64/helm /usr/bin/helm
-echo -e "Helm Successfully installed $(helm_apps version)"
+echo -e "Helm Successfully installed $(helm version)"
