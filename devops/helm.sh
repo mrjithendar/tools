@@ -7,7 +7,7 @@ fi
 
 echo -e "installing helm"
 #curl -sL https://git.io/get_helm.sh | bash
-curl -L https://get.helm.sh/helm-v3.13.2-linux-amd64.tar.gz -o /tmp/helm_apps.tar.gz
-tar -zxvf /tmp/helm_apps.tar.gz -C /tmp
-mv /tmp/linux-amd64/helm_apps /usr/local/bin/helm_apps
+curl -L https://get.helm.sh/helm-v3.13.2-linux-amd64.tar.gz -o /tmp/helm.tar.gz
+tar -zxvf /tmp/helm.tar.gz -C /tmp
+cp /tmp/linux-amd64/helm /usr/bin/helm
 echo -e "Helm Successfully installed $(helm_apps version)"
