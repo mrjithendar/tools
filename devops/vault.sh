@@ -7,6 +7,7 @@ yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.
 sudo yum -y install vault
 
 mkdir -p /etc/vault/data
+mkdir -p /var/lib/vault/
 cp dependencies/vault/vault_config.hcl /var/lib/vault/vault_config.hcl
 cp dependencies/vault/vault.service /etc/systemd/system/vault.service
 
