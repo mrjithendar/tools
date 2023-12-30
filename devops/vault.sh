@@ -9,8 +9,9 @@ sudo yum -y install vault
 mkdir -p /etc/vault/data
 mkdir -p /var/lib/vault/
 pwd
-cp devops/dependencies/vault/vault_config.hcl /var/lib/vault/vault_config.hcl
-cp devops/dependencies/vault/vault.service /etc/systemd/system/vault.service
+rm -rf /etc/vault.d/vault.hcl
+cp /root/devops/dependencies/vault/vault.hcl /var/lib/vault/vault.hcl
+#cp /root/devops/dependencies/vault/vault.service /etc/systemd/system/vault.service
 
 systemctl daemon-reload
 systemctl enable vault
