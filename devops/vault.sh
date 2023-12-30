@@ -11,7 +11,7 @@ mkdir -p /var/lib/vault/
 pwd
 rm -rf /etc/vault.d/vault.hcl
 cp devops/dependencies/vault/vault.hcl /etc/vault.d/vault.hcl
-#cp /root/devops/dependencies/vault/vault.service /etc/systemd/system/vault.service
+cp devops/dependencies/vault/vault.service /etc/systemd/system/vault.service
 
 systemctl daemon-reload
 systemctl enable vault
