@@ -16,3 +16,9 @@ systemctl enable vault
 systemctl start vault
 
 echo "installed terraform vault $(vault -version)"
+
+export VAULT_ADDR='http://127.0.0.1:8200'
+vault status
+echo "initiate the hashicorp vault"
+vault operator init -key-shares=1 -key-threshold=1
+
