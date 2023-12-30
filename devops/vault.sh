@@ -8,6 +8,7 @@ sudo yum -y install vault
 
 mkdir -p /etc/vault/data
 mkdir -p /var/lib/vault/
+pwd
 cp dependencies/vault/vault_config.hcl /var/lib/vault/vault_config.hcl
 cp dependencies/vault/vault.service /etc/systemd/system/vault.service
 
