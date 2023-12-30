@@ -1,10 +1,16 @@
-
+export VAULT_ADDR='http://127.0.0.1:8200'
 vault status # Get the vault status
+vault operator init # 5 unseal keys with 1 root key and we need atleast 3 to unlock/unseal the vault
+      (OR)
 vault operator init -key-shares=1 -key-threshold=1 # init the vault and get the unseal key and root key, examples are below
-               Unseal Key 1: fOnCO+wUrQub7IwxbeiH2gEPhwexFP86mywAf7O40FE=
-               Initial Root Token: hvs.ndGHoN8lWuFSWWH5Jne6iI9S
-export VAULT_TOKEN='rootkey'
-vault operator seal/unseal
+               Unseal Key 1: yUo28S4j4W7J7IOr5XtQ2Oqv7kWmmnoTT/8t4x9Zkg4=
+               Initial Root Token: hvs.GHrN4ZRLRuEO37rinekgeQxw
+export VAULT_TOKEN='hvs.GHrN4ZRLRuEO37rinekgeQxw'
+vault operator seal/unseal # need to unseal the vault
+vault login rootkey
+
+vault policy write jenkins jenkins_policy.hcl
+
 vault auth enable approle
 vault write auth/approle/role/jenkins-role token_num_uses=0 secret_id_num_uses=0 policies=”jenkins”
 
