@@ -18,6 +18,8 @@ systemctl start vault
 
 echo "installed terraform vault $(vault -version)"
 
+vault policy write jenkins devops/dependencies/vault/jenkins-policy.hcl
+
 # export VAULT_ADDR='http://127.0.0.1:8200'
 # vault status # Get the vault status
 # vault operator init -key-shares=1 -key-threshold=1 # init the vault and get the unseal key and root key, examples are below
