@@ -30,7 +30,7 @@ else
   tool=$1
 fi
 
-SCRIPT_COUNT=$(ls /tmp/tools/devops/$tool |wc -l)
+SCRIPT_COUNT=$(ls /tmp/tools/devops/$tool | wc -l)
 case $SCRIPT_COUNT in
   1)
     echo -e "\e[1;33m★★★ Installing $tool ★★★\e[0m"
