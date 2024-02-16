@@ -1,7 +1,6 @@
 #!/bin/bash
 
 ## Check Root User
-
 if [ $(id -u) -ne 0 ]; then
   echo "You should be root user to perform this script"
   exit 1
