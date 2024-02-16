@@ -1,8 +1,10 @@
 function SELECT() {
 export PS3=""
 # select file in $(find . -type f); do
-# select tool in `ls -1 /tmp/tools/devops`; do
-select file in $(find /tmp/tools/devops -type f); do
+# ls -p /tmp/tools/devops | grep -v '/'
+# ls -p: This lists the contents of the current directory and appends a slash to directory names.
+# grep -v '/: This filters out lines containing slashes (directories), leaving only files.
+select tool in `ls -p /tmp/tools/devops | grep -v '/'`; do
   break
 done
 }< <(timeout 2s cat /dev/urandom)
