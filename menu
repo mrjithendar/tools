@@ -1,6 +1,8 @@
 function SELECT() {
 export PS3=""
-select tool in `ls -1 /tmp/tools/devops`; do
+# select file in $(find . -type f); do
+# select tool in `ls -1 /tmp/tools/devops`; do
+select file in $(find /tmp/tools/devops -type f); do
   break
 done
 }< <(timeout 2s cat /dev/urandom)

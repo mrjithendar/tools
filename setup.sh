@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo -e "\n\e[1;33m You can find all the scripts in below repo\e[0m\n"
+echo -e "\n\e[1;33m You can find all the scripts in below repo.\e[0m\n"
 echo -e "https://github.com/mrjithendar/tools.git\n"
 
 
