@@ -4,7 +4,7 @@ export PS3=""
 # ls -p /tmp/tools/devops | grep -v '/'
 # ls -p: This lists the contents of the current directory and appends a slash to directory names.
 # grep -v '/: This filters out lines containing slashes (directories), leaving only files.
-select tool in `ls -p /tmp/tools/devops | grep -v '/'`; do
+select tool in `ls -1 /tmp/tools/devops`; do
   break
 done
 }< <(timeout 2s cat /dev/urandom)
