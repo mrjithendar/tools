@@ -37,7 +37,7 @@ case $SCRIPT_COUNT in
     sh /tmp/tools/devops/$tool
     ;;
   *)
-    echo -e "\e[31m Found Multiple Scripts, Choose One.. "
+    echo -e "\e[31m Found Multiple Scripts, Choose One..\e[0m"
     select script in `ls -1 /tmp/tools/devops/$tool | awk -F / '{print $NF}'`; do
       echo -e "\e[1;33m★★★ Installing $tool ★★★\e[0m"
       sh /tmp/tools/devops/$tool
