@@ -3,7 +3,7 @@
 ## check OS
 OS=$(cat /etc/redhat-release | awk {'print $1, $NF'})
 
-if [ OS == "CentOS 8" ]; then
+if [ $OS == "CentOS 8" ]; then
     echo "OS is valid, currently running on: $OS"
     else
     echo "Please use CentOS AMI, Currently Running on: $OS"
