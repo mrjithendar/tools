@@ -3,7 +3,11 @@
 ## check OS
 OS=$(cat /etc/redhat-release | awk {'print $1, $NF'})
 
-if [ OS == "CentOS 8" ]
+if [ OS == "CentOS 8" ]; then
+    echo "valid"
+    else
+        echo "Please use CentOS AMI"
+fi
 
 if [ $(id -u) -ne 0 ]; then
   echo "You should run as root user"
