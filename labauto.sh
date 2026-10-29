@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install a DevOps tool from devops/<tool>.sh. Usage: setup.sh [tool]
-# Install as a command with: sudo ln -s /tmp/tools/setup.sh /usr/bin/labauto
+# Install as a command with: sudo ln -s setup.sh /usr/bin/labauto
 set -euo pipefail
 REPO=https://github.com/mrjithendar/tools.git
 DIR=/tmp/tools
