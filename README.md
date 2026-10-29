@@ -106,3 +106,7 @@ helm template vault vault --repo https://helm.releases.hashicorp.com --version 0
   -f minikube/vault/values.yaml > /tmp/vault.yaml
 python3 tests/test_vault_chart.py /tmp/vault.yaml
 ```
+
+## License
+
+Copyright (c) 2026 Jithendar Dharmapuri. All rights reserved. This is proprietary software; no use, copying, modification or distribution is permitted without written permission. See [LICENSE](LICENSE).
