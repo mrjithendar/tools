@@ -1,6 +1,6 @@
 # tools
 
-- **[labauto](#labauto)**: one-command installers for DevOps tools (`setup.sh`, `devops/`).
+- **[labauto](#labauto)**: one-command installers for DevOps tools (`labauto.sh`, `devops-tools/`).
 - **[Cluster tooling](#cluster-tooling)**: the Minikube cluster, ingress/TLS, platform services
   and observability that [roboshop-ai](https://github.com/mrjithendar/roboshop-ai) runs on.
 
@@ -8,16 +8,16 @@
 
 ```bash
 git clone https://github.com/mrjithendar/tools.git /tmp/tools
-sudo ln -s /tmp/tools/setup.sh /usr/bin/labauto
+sudo ln -s /tmp/tools/labauto.sh /usr/bin/labauto
 
 labauto          # numbered menu
 labauto helm     # install by name
 ```
 
-Each run updates `/tmp/tools` and executes `devops/<tool>.sh`. Config files the installers
-copy into place (systemd units, Prometheus/Loki/Promtail config, Vault policy) are in
-`devops/dependencies/`. To add a tool, add `devops/<name>.sh`; it appears in the menu
-automatically.
+Each run updates `/tmp/tools` and executes `devops-tools/<tool>.sh`. Config files the
+installers copy into place (systemd units, Prometheus/Loki/Promtail config, Vault policy) are
+in `devops-tools/dependencies/`. To add a tool, add `devops-tools/<name>.sh`; it appears in
+the menu automatically.
 
 ## Cluster tooling
 
@@ -41,7 +41,6 @@ Every entry point can run from any directory, and most accept `--help`.
 | `./create-secrets.sh [--apply] [--all]` | Create missing installation credentials. Never rotates existing ones. |
 | `./deploy-argocd.sh [app\|all\|roboshop\|list\|status]` | Register and sync Argo CD Applications. |
 | `./deploy-traefik.sh` | Install or upgrade Traefik on its own (`minikube/deploy-traefik.sh`). |
-| `./patch-ssl.sh` | Reuse the ready `jithendar.com` certificate for all Traefik routes ([details](minikube/shared-tls/README.md)). |
 | `./kubectl.sh ARGS` | `kubectl` with the downloaded cluster kubeconfig. |
 
 Less common operations in `minikube/`:
@@ -59,7 +58,7 @@ Less common operations in `minikube/`:
 
 | Path | Contents |
 |---|---|
-| `minikube/` | Cluster scripts and per-component config: [argocd](minikube/argocd/README.md), [cert-manager](minikube/cert-manager/README.md), [traefik](minikube/traefik/README.md), [shared-tls](minikube/shared-tls/README.md), [vault](minikube/vault/README.md), [jfrog](minikube/jfrog/README.md), [metrics-server](minikube/metrics-server/README.md), [ecr-refresh](minikube/ecr-refresh/README.md), `namespaces/`, and shared RoboShop ingress/config in [roboshop](minikube/roboshop/README.md). |
+| `minikube/` | Cluster scripts and per-component config: [argocd](minikube/argocd/README.md), [cert-manager](minikube/cert-manager/README.md), [traefik](minikube/traefik/README.md), [vault](minikube/vault/README.md), [jfrog](minikube/jfrog/README.md), [metrics-server](minikube/metrics-server/README.md), [ecr-refresh](minikube/ecr-refresh/README.md), `namespaces/`, and shared RoboShop ingress/config in [roboshop](minikube/roboshop/README.md). |
 | `observability/` | Prometheus, Grafana, Loki/Alloy, OpenTelemetry collector, Jaeger. See [observability/README.md](observability/README.md). |
 | `scripts/argocd/` | `bootstrap.py`, `deploy.py`, and `validate.py` (renders the whole catalog and checks ownership). |
 | `scripts/setup/` | Host initialization (`initialize.py`, pinned `versions.json`) and secrets ([SECRETS.md](scripts/setup/SECRETS.md)). |
@@ -75,11 +74,15 @@ client-side commands. x86_64 and ARM64 only.
 
 The Argo CD catalog (`argocd/`), the microservices, their manifests, Terraform and the
 operations docs live in roboshop-ai. Its Applications read `minikube/*` and
-`observability/*` from this repository. Clone both side by side, or set `ROBOSHOP_AI_DIR`:
+`observability/*` from this repository. The shared jithendar.com certificate, the default
+Traefik TLSStore and `patch-ssl.sh` live in
+[jithendar.com](https://github.com/mrjithendar/jithendar.com). Clone all three side by side,
+or set `ROBOSHOP_AI_DIR` / `JITHENDAR_COM_DIR`:
 
 ```text
 Work/
   roboshop-ai/
+  jithendar.com/
   tools/
 ```
 
@@ -88,11 +91,11 @@ Argo CD deploys the **pushed** revision of `master`. Commit and push changes her
 
 ### Tests
 
-Needs Python 3.9+ with `pytest` and `PyYAML`, and a roboshop-ai checkout.
+Needs Python 3.9+ with `pytest` and `PyYAML`, and the roboshop-ai and jithendar.com checkouts.
 
 ```bash
 python3 scripts/argocd/validate.py
-python3 -m pytest -q tests minikube/test-*.py minikube/shared-tls
+python3 -m pytest -q tests minikube/test-*.py
 ```
 
 The Vault chart test runs only against a rendered chart:

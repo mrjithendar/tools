@@ -40,4 +40,4 @@ kubectl --context="$KUBE_CONTEXT" get ingressclass traefik
 kubectl --context="$KUBE_CONTEXT" -n traefik get service traefik
 echo 'Traefik is ready inside Kubernetes. NodePorts: HTTP 30080, HTTPS 30443.'
 echo 'On the Vultr Minikube host, run: bash minikube/expose-ingress.sh'
-echo 'Manage applications and cert-manager through the argocd/ catalog. Reuse a ready certificate with ./patch-ssl.sh.'
+echo 'Manage applications and cert-manager through the argocd/ catalog. The shared jithendar.com certificate and TLSStore live in the jithendar.com repository.'
