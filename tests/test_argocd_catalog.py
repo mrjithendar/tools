@@ -85,7 +85,8 @@ def test_imperative_guard_allows_unregistered_application(tmp_path):
 
 def test_inventory_excludes_cluster_managed_networking():
     import json
-    inventory=json.loads((ARGOCD/'workload-inventory.json').read_text())
+    from repos import CATALOGS
+    inventory=[row for directory in CATALOGS for row in json.loads((directory/'workload-inventory.json').read_text())]
     assert not any(namespace=='kube-system' and name in {'coredns','kindnet','kube-proxy'}
                    for kind,namespace,name in inventory)
     assert ['Deployment','kube-system','metrics-server'] in inventory
@@ -94,7 +95,9 @@ def test_inventory_excludes_cluster_managed_networking():
 def test_required_inventory_matches_active_catalog_and_rejects_missing_workloads():
     import json
     import pytest
-    expected={tuple(row) for row in json.loads((ARGOCD/'workload-inventory.json').read_text())}
+    from repos import CATALOGS
+    # Required workloads come from both catalogs (roboshop-ai/argocd and tools/argocd).
+    expected={tuple(row) for directory in CATALOGS for row in json.loads((directory/'workload-inventory.json').read_text())}
     assert not any(name in ('product-ingestion','shopping-agent') for _,ns,name in expected)
     assert ('Deployment','roboshop-ai','moks') in expected
     assert ('Deployment','roboshop-ai','catalogue-service') in expected
@@ -133,7 +136,7 @@ def test_retired_ingestion_has_no_deployable_or_runtime_references():
     assert not (APP/'services/product-ingestion').exists()
     assert not (ROOT/'minikube/gitops/adoption/product-ingestion').exists()
     assert not (ARGOCD/'product-ingestion.yaml').exists()
-    roots=[APP/'services', APP/'scripts', APP/'.github/workflows', ROOT/'scripts', ARGOCD, APP/'infrastructure', ROOT/'minikube']
+    roots=[APP/'services', APP/'.github/workflows', ROOT/'scripts', ARGOCD, APP/'infrastructure', ROOT/'minikube']
     for directory in roots:
         assert directory.is_dir(),directory
         for path in directory.rglob('*'):
@@ -144,3 +147,33 @@ def test_retired_ingestion_has_no_deployable_or_runtime_references():
             text=path.read_text()
             assert 'product-ingestion' not in text,path
             assert 'INGESTION_URL' not in text,path
+
+
+def test_monitoring_stack_lives_in_tools_catalog():
+    import json
+    from repos import CATALOGS, MONITORING_ARGOCD
+    assert MONITORING_ARGOCD in CATALOGS and ARGOCD in CATALOGS
+    tools=yaml.safe_load((MONITORING_ARGOCD/'kustomization.yaml').read_text())['resources']
+    shop=yaml.safe_load((ARGOCD/'kustomization.yaml').read_text())['resources']
+    moved={'grafana.yaml','prometheus.yaml','loki.yaml','project-logging.yaml'}
+    assert moved <= set(tools)
+    assert not moved & set(shop)
+    assert not any((ARGOCD/name).exists() for name in moved)
+    # Their workloads are required by the tools inventory, not roboshop-ai's.
+    monitoring={tuple(r) for r in json.loads((MONITORING_ARGOCD/'workload-inventory.json').read_text())}
+    assert {('Deployment','monitoring',n) for n in ('alloy','grafana','loki','prometheus')} <= monitoring
+    assert not any(ns=='monitoring' for _,ns,_ in json.loads((ARGOCD/'workload-inventory.json').read_text()))
+    # Every monitoring app reads its sources from tools.git (or a pinned chart repository).
+    for doc in module.catalog():
+        if doc['kind']=='Application' and doc['metadata']['name'] in ('grafana','prometheus','loki'):
+            for source in doc['spec'].get('sources',[doc['spec'].get('source')]):
+                assert source['repoURL'].startswith(('https://github.com/mrjithendar/tools.git','https://grafana-community.github.io/')),source
+
+
+def test_deploy_catalog_merges_both_catalogs():
+    import importlib.util as util
+    spec=util.spec_from_file_location('catalog_deploy',ROOT/'scripts/argocd/deploy.py')
+    deploy=util.module_from_spec(spec);spec.loader.exec_module(deploy)
+    apps,projects=deploy.catalog()
+    assert {'grafana','prometheus','loki','web','moks'} <= set(apps)
+    assert {'platform','logging'} <= set(projects)

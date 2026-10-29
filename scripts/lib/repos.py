@@ -1,9 +1,13 @@
 """Local checkouts of the repositories Argo CD reads.
 
 This folder is the tools.git checkout (cluster configuration). The microservices, their
-Kubernetes manifests, tests and the Argo CD catalog (argocd/) live in roboshop-ai.git, and the
-shared jithendar.com TLSStore lives in jithendar.com.git. Both are expected as sibling checkouts
-of tools (override with ROBOSHOP_AI_DIR / JITHENDAR_COM_DIR).
+Kubernetes manifests and tests live in roboshop-ai.git, and the shared jithendar.com TLSStore lives
+in jithendar.com.git. Both are expected as sibling checkouts of tools (override with
+ROBOSHOP_AI_DIR / JITHENDAR_COM_DIR).
+
+The Argo CD catalog is split in two (CATALOGS): roboshop-ai/argocd (the shop, shared platform apps
+and the "platform" AppProject) and tools/argocd (the monitoring stack: Grafana, Prometheus,
+Loki/Alloy and the "logging" AppProject). Tools read both together.
 """
 import os
 from pathlib import Path
@@ -12,7 +16,9 @@ ROOT = Path(__file__).resolve().parents[2]          # tools.git checkout
 TOOLS = ROOT
 APP = Path(os.environ.get('ROBOSHOP_AI_DIR', TOOLS.parent / 'roboshop-ai')).resolve()
 SITE = Path(os.environ.get('JITHENDAR_COM_DIR', TOOLS.parent / 'jithendar.com')).resolve()
-ARGOCD = APP / 'argocd'                             # Argo CD Applications and projects
+ARGOCD = APP / 'argocd'                             # roboshop-ai's Argo CD Applications and projects
+MONITORING_ARGOCD = TOOLS / 'argocd'                # monitoring stack Applications (Grafana, Prometheus, Loki)
+CATALOGS = (ARGOCD, MONITORING_ARGOCD)
 TOOLS_REPO = 'https://github.com/mrjithendar/tools.git'
 APP_REPO = 'https://github.com/mrjithendar/roboshop-ai.git'
 SITE_REPO = 'https://github.com/mrjithendar/jithendar.com.git'

@@ -1,0 +1,27 @@
+[
+  [
+    "Deployment",
+    "kube-system",
+    "metrics-server"
+  ],
+  [
+    "Deployment",
+    "monitoring",
+    "alloy"
+  ],
+  [
+    "Deployment",
+    "monitoring",
+    "grafana"
+  ],
+  [
+    "Deployment",
+    "monitoring",
+    "loki"
+  ],
+  [
+    "Deployment",
+    "monitoring",
+    "prometheus"
+  ]
+]

@@ -9,7 +9,7 @@ import tempfile
 import sys
 import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
-from repos import ARGOCD, ROOT, checkout  # noqa: E402
+from repos import CATALOGS, ROOT, checkout  # noqa: E402
 
 
 def command(args):
@@ -21,7 +21,8 @@ def objects(text):
 
 
 def catalog():
-    return objects(command(['kubectl', 'kustomize', str(ARGOCD)]))
+    """Every catalog rendered together, so ownership and project checks span both repositories."""
+    return [doc for directory in CATALOGS for doc in objects(command(['kubectl', 'kustomize', str(directory)]))]
 
 
 def render(app, external=False):
@@ -67,14 +68,15 @@ def render(app, external=False):
 def validate_inventory(workloads):
     # This is the required active catalog, not a historical snapshot of live pods.
     # Do not filter expected entries by rendered apps: that would hide omissions.
-    inventory = ARGOCD/'workload-inventory.json'
-    expected = {tuple(row) for row in json.loads(inventory.read_text())}
+    expected = {tuple(row) for directory in CATALOGS for row in json.loads((directory/'workload-inventory.json').read_text())}
     assert expected <= workloads, f'Unmanaged workloads: {sorted(expected-workloads)}'
 
 
 def validate(external=False):
     docs=catalog();projects={d['metadata']['name']:d for d in docs if d['kind']=='AppProject'}
     apps=[d for d in docs if d['kind']=='Application']
+    kinds_names=[(d['kind'],d['metadata']['name']) for d in docs]
+    assert len(kinds_names)==len(set(kinds_names)),f'Defined in more than one catalog: {sorted({k for k in kinds_names if kinds_names.count(k)>1})}'
     owners={};workloads=set()
     assert len(apps)==len({d['metadata']['name'] for d in apps})
     for app in apps:

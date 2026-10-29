@@ -13,7 +13,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/lib'))
-from repos import ARGOCD  # noqa: E402
+from repos import CATALOGS  # noqa: E402
 ARGOCD_CHART_VERSION = '10.10.5'
 # Current shop only. Legacy apps, optional AI apps and existing data services
 # require an explicit name so this shortcut does not restore retired workloads.
@@ -23,8 +23,14 @@ ROBOSHOP = ['roboshop-config', 'currency-service', 'catalogue-service',
 
 
 def catalog():
-    resources = yaml.safe_load((ARGOCD / 'kustomization.yaml').read_text())['resources']
-    docs = [yaml.safe_load((ARGOCD / name).read_text()) for name in resources]
+    """Applications and AppProjects from every catalog (roboshop-ai/argocd and tools/argocd)."""
+    docs = []
+    for directory in CATALOGS:
+        resources = yaml.safe_load((directory / 'kustomization.yaml').read_text())['resources']
+        docs += [yaml.safe_load((directory / name).read_text()) for name in resources]
+    names = [d['metadata']['name'] for d in docs]
+    if dupes := {n for n in names if names.count(n) > 1}:
+        raise RuntimeError(f'Defined in more than one catalog: {sorted(dupes)}')
     return ({d['metadata']['name']: d for d in docs if d['kind'] == 'Application'},
             {d['metadata']['name']: d for d in docs if d['kind'] == 'AppProject'})
 
@@ -70,7 +76,7 @@ def main():
     if 'cert-manager' in args.apps:
         apps['cert-manager'] = yaml.safe_load((ARGOCD / 'cert-manager.yaml').read_text())
     if args.apps == ['list']:
-        print('all: every Application registered in argocd/kustomization.yaml')
+        print('all: every Application registered in roboshop-ai/argocd and tools/argocd')
         print('roboshop: ' + ' '.join(ROBOSHOP))
         print('Available apps: ' + ' '.join(sorted(apps)))
         return
