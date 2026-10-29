@@ -17,7 +17,7 @@ def test_catalog_has_unique_safe_ownership():
     assert {'moks','catalogue-service'} <= names
     assert not {'shopping-agent','product-ingestion','jfrog'} & names
     assert not {'argocd','traefik','coredns','kube-proxy','kindnet'}&names
-    assert len(apps)==24  # frontend + nginx consolidated into web
+    assert len(apps)==20  # roboshop-ai/argocd (16) + tools/argocd (4); jaeger, otel-collector, shared-tls, roboshop-letsencrypt retired
     assert owners[('apps','Deployment','roboshop-ai','web')]=='web'
     assert 'cert-manager' not in names
     assert owners[('apps','Deployment','roboshop-ai','mongodb')]=='mongodb'
