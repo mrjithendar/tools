@@ -7,8 +7,9 @@
 ## labauto
 
 ```bash
-git clone https://github.com/mrjithendar/tools.git /tmp/tools
-sudo ln -s /tmp/tools/labauto.sh /usr/bin/labauto
+git clone https://github.com/mrjithendar/tools.git
+cd tools
+sudo ln -s $(pwd)/labauto.sh /usr/bin/labauto
 
 labauto          # numbered menu
 labauto helm     # install by name

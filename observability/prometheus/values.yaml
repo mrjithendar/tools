@@ -24,6 +24,17 @@ extraScrapeConfigs:
           - payment-service.roboshop-ai.svc.cluster.local:4105
           - shipping-service.roboshop-ai.svc.cluster.local:4106
           - user-service.roboshop-ai.svc.cluster.local:4109
+  # jithendar.com: every site pod, found through the headless Service jithendar-com-metrics (DNS A records),
+  # so no Kubernetes API permissions are needed. Port 9464 is cluster-internal (NetworkPolicy in that repo).
+  - job_name: jithendar-com
+    metrics_path: /metrics
+    dns_sd_configs:
+      - names: ["jithendar-com-metrics.jithendar.svc.cluster.local"]
+        type: A
+        port: 9464
+    relabel_configs:
+      - target_label: service
+        replacement: jithendar-com
   - job_name: loki
     static_configs:
       - targets: ["loki.monitoring.svc.cluster.local:3100"]
