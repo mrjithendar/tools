@@ -1,0 +1,31 @@
+# RoboShop cluster tooling (roboshop/): Terraform providers and this repository's workflows.
+version: 2
+updates:
+- package-ecosystem: terraform
+  schedule:
+    interval: weekly
+    day: monday
+    time: 09:00
+    timezone: Asia/Kolkata
+  open-pull-requests-limit: 5
+  groups:
+    terraform-minor-patch:
+      patterns:
+      - '*'
+      update-types:
+      - minor
+      - patch
+  commit-message:
+    prefix: chore(deps)
+  directories:
+  - /roboshop/infrastructure
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: weekly
+    day: monday
+    time: 09:00
+    timezone: Asia/Kolkata
+  open-pull-requests-limit: 5
+  commit-message:
+    prefix: chore(ci)

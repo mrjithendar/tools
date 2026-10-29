@@ -1,0 +1,11 @@
+{
+  "deploy-minikube.sh": "minikube/install.sh",
+  "kubectl.sh": "scripts/dev/kubectl.sh",
+  "generate-secrets.py": "scripts/data/generate-secrets.py",
+  "delete_branch.sh": "scripts/maintenance/delete-branches.sh",
+  "scripts/reset-test-checkout.py": "scripts/maintenance/reset-test-checkout.py",
+  "scripts/seed-minikube-demo.py": "scripts/data/seed-minikube-demo.py",
+  "scripts/squash-history.py": "scripts/maintenance/squash-history.py",
+  "deploy-traefik.sh": "minikube/deploy-traefik.sh",
+  "patch-ssl.sh": "minikube/setup-shared-tls.sh"
+}
