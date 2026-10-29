@@ -112,7 +112,7 @@ if [[ "$OS" == linux && -r /etc/os-release ]]; then
     echo 'CentOS: for Docker prerequisites, run ./init.sh --profile minikube (Stream 9/10).'
   fi
 fi
-command -v docker >/dev/null 2>&1 || fail 'Run ./init.sh --profile minikube, then rerun. See minikube/README.md.'
+command -v docker >/dev/null 2>&1 || fail 'Run ./init.sh --profile minikube, then rerun. See README.md.'
 if ! docker info >/dev/null 2>&1; then
   if [[ "$OS" == darwin && -n "$DOCKER_APP" ]]; then
     open -a "$DOCKER_APP" || fail 'Could not open Docker Desktop.'

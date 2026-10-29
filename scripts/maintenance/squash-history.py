@@ -5,8 +5,8 @@
 
 """Preview or squash a GitHub branch into one identical-tree baseline.
 
-Preview: python3 scripts/squash-history.py
-Execute: python3 scripts/squash-history.py --apply
+Preview: python3 scripts/maintenance/squash-history.py
+Execute: python3 scripts/maintenance/squash-history.py --apply
 Requires: git, authenticated gh CLI, repository administration permissions.
 
 This intentionally supports our simple repository ruleset (deletion + force-push
