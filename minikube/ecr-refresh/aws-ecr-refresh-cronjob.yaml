@@ -89,8 +89,9 @@ spec:
             env:
             - name: ECR_REGISTRY
               value: 881026659929.dkr.ecr.us-east-1.amazonaws.com
-            - name: TARGET_NAMESPACES
-              value: argocd,cert-manager,jithendar,monitoring,roboshop-ai,traefik
+            # Every other namespace gets ecr-pull, including ones created later.
+            - name: EXCLUDED_NAMESPACES
+              value: default,kube-system,kube-public,kube-node-lease
             securityContext: *id001
             resources: *id002
             volumeMounts:

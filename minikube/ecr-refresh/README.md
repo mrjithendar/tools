@@ -6,12 +6,27 @@ Enable from the repository root with authenticated local AWS CLI:
 ./bootstrap-cluster.sh --pull-secrets-only --schedule-pull-secrets
 ```
 
-This seeds `ecr-pull` in the managed namespaces, then installs a CronJob in
+This seeds `ecr-pull` in the bootstrap namespaces, then installs a CronJob in
 `roboshop-ai` running at 00:00, 06:00, 12:00 and 18:00 UTC. ECR tokens last
-12 hours. Existing namespaces/default ServiceAccounts are prepared by bootstrap.
-The CronJob cannot create/delete secrets or read unrelated secrets: its Roles
-allow only GET/PATCH on `ecr-pull`. Updates preserve other registry entries and
-use resourceVersion to reject concurrent modifications. Failed Jobs retry twice.
+12 hours.
+
+Each run covers **every namespace except Kubernetes' own** (`default`,
+`kube-system`, `kube-public`, `kube-node-lease`; change `EXCLUDED_NAMESPACES` in
+the CronJob to adjust), including namespaces created after install:
+
+- `ecr-pull` is created if missing, otherwise patched with the new token.
+  Patches keep other registry entries and use resourceVersion to reject
+  concurrent modifications.
+- `ecr-pull` is added to the namespace's `default` ServiceAccount (existing
+  entries are kept), so pods pull from ECR without their own `imagePullSecrets`.
+- Terminating namespaces are skipped. A brand-new namespace whose `default`
+  ServiceAccount does not exist yet gets it attached on the next run.
+
+A new namespace can pull images within six hours; to make it immediate, run a
+Job by hand (below). The ClusterRole allows only: list namespaces, create
+Secrets, get/patch Secrets named `ecr-pull`, and get/patch ServiceAccounts named
+`default`. RBAC cannot restrict `create` by name; the script only creates
+`ecr-pull`. It cannot read any other Secret. Failed Jobs retry twice.
 
 ## AWS credentials required inside Minikube
 
@@ -39,9 +54,9 @@ kubectl --context=mk4 -n roboshop-ai logs job/ecr-refresh-check -c refresh
 
 Use another job name for later tests. Missing credentials produce a pod
 configuration error; AWS access failures stop the init container without
-changing tokens. Missing pull Secrets are reported, not recreated by the job;
-rerun bootstrap to restore them. Partial namespace failures leave other successful
-updates in place and fail the Job visibly. Monitor failed Jobs; no external
+changing tokens. A deleted `ecr-pull` is recreated on the next run. Partial
+namespace failures leave other successful updates in place and fail the Job
+visibly. Monitor failed Jobs; no external
 alerting is configured.
 
 Suspend without deleting credentials:
