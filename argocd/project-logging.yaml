@@ -27,6 +27,11 @@ spec:
     kind: PersistentVolumeClaim
   - group: apps
     kind: Deployment
+  # Argo CD leaves unlisted kinds out of the app tree, so these two are what show the pods, logs and events.
+  - group: apps
+    kind: ReplicaSet
+  - group: ''
+    kind: Pod
   - group: rbac.authorization.k8s.io
     kind: Role
   - group: rbac.authorization.k8s.io

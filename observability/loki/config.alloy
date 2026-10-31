@@ -1,8 +1,9 @@
 // One collector uses the API: no privileged host mounts or per-node agents.
 discovery.kubernetes "pods" {
   role = "pod"
-  // jithendar: the site grants read access itself (Role alloy-logs in the jithendar.com repo, k8s/70-observability.yaml).
-  namespaces { names = ["roboshop-ai", "traefik", "observability", "jithendar"] }
+  // jithendar and moks grant read access themselves (Role alloy-logs in the jithendar.com repo,
+  // k8s/70-observability.yaml, and in the moks chart, templates/alloy-logs.yaml).
+  namespaces { names = ["roboshop-ai", "traefik", "observability", "jithendar", "moks"] }
 }
 discovery.relabel "logs" {
   targets = discovery.kubernetes.pods.targets

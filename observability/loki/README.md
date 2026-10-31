@@ -14,12 +14,12 @@ Publish these repository changes to `master`, then:
 
 This syncs the Loki/Alloy Application and the existing Grafana Application. It does
 not install another Grafana. Open **https://jithendar.com/grafana/** → Explore →
-**Loki** and query `{namespace="roboshop-ai"}`, `{namespace="traefik"}` or
-`{namespace="observability"}`.
+**Loki** and query `{namespace="roboshop-ai"}`, `{namespace="traefik"}`,
+`{namespace="observability"}`, `{namespace="jithendar"}` or `{namespace="moks"}`.
 No new password is needed; use your existing Grafana login. Loki is ClusterIP-only,
 with no public ingress or built-in authentication. Trusted cluster workloads can
 reach it; don't expose port 3100 externally. API collection uses RoleBindings
-limited to pods/pods-log in those three namespaces, not Secrets or cluster-admin.
+limited to pods/pods-log in those namespaces, not Secrets or cluster-admin.
 
 ## Resource and data boundaries
 
