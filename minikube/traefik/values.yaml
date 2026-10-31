@@ -6,6 +6,10 @@ ingressClass:
   name: traefik
   isDefaultClass: false
 providers:
+  # /roboshop reaches the EKS load balancer through an ExternalName Service (eks/edge). Only cluster admins can create
+  # Services here, so this does not let tenants point Traefik at arbitrary hosts.
+  kubernetesCRD:
+    allowExternalNameServices: true
   kubernetesIngress:
     enabled: true
     ingressClass: traefik

@@ -144,3 +144,18 @@ resource "aws_iam_role_policy_attachment" "eks_ebs_csi" {
   role       = aws_iam_role.eks_ebs_csi[0].name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEBSCSIDriverPolicyV2"
 }
+
+# Lets the AWS Load Balancer Controller manage the NLB, through EKS Pod Identity. Policy: policies/, the upstream one.
+resource "aws_iam_role" "eks_load_balancer_controller" {
+  count = local.eks_ingress_enabled ? 1 : 0
+  name  = "${local.eks_name}-load-balancer-controller"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = ["sts:AssumeRole", "sts:TagSession"]
+      Principal = { Service = "pods.eks.amazonaws.com" }
+    }]
+  })
+  tags = local.common_tags
+}

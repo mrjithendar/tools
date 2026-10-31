@@ -1,0 +1,19 @@
+# Issued through DNS-01 (Cloudflare), because the domain points at mk4 and Let's Encrypt cannot reach this cluster over
+# HTTP. cert-manager renews it before expiry and the gateway picks up the new Secret without a restart. The Secret must
+# live in the gateway's namespace for credentialName to resolve.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: jithendar-com
+spec:
+  secretName: jithendar-com-tls
+  dnsNames:
+  - jithendar.com
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always

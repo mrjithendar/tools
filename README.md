@@ -59,7 +59,8 @@ Less common operations in `minikube/`:
 | Path | Contents |
 |---|---|
 | `minikube/` | Cluster scripts and per-component config: [argocd](minikube/argocd/README.md), [cert-manager](minikube/cert-manager/README.md), [traefik](minikube/traefik/README.md), [vault](minikube/vault/README.md), [jfrog](minikube/jfrog/README.md), [metrics-server](minikube/metrics-server/README.md), [ecr-refresh](minikube/ecr-refresh/README.md), `namespaces/`, and shared RoboShop ingress/config in [roboshop](minikube/roboshop/README.md). |
-| `infrastructure/` | Terraform for the lab AWS account: VPC, ECR, SES, Bedrock role ([details](infrastructure/README.md)). |
+| `infrastructure/` | Terraform for the lab AWS account: VPC, ECR, SES, Bedrock role, the `roboshop-demo` EKS cluster and its add-ons ([details](infrastructure/README.md)). |
+| `eks/` | EKS Applications, RoboShop ingress (AWS Load Balancer Controller, Istio, mTLS) and its [runbook](eks/RUNBOOK.md) ([details](eks/README.md)). |
 | `observability/` | Prometheus, Grafana, Loki/Alloy, OpenTelemetry collector, Jaeger. See [observability/README.md](observability/README.md). |
 | `scripts/argocd/` | `bootstrap.py`, `deploy.py`, and `validate.py` (renders the whole catalog and checks ownership). |
 | `scripts/setup/` | Host initialization (`initialize.py`, pinned `versions.json`) and secrets ([SECRETS.md](scripts/setup/SECRETS.md)). |

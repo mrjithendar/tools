@@ -1,0 +1,8 @@
+# TLS and routing on the Istio ingress gateway. The gateway itself comes from infrastructure/eks-ingress.tf.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: istio-ingress
+resources:
+- jithendar-com-certificate.yaml
+- public-gateway.yaml
+- roboshop-virtualservice.yaml

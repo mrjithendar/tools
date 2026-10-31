@@ -1,0 +1,21 @@
+# Outranks the Ingress that serves /roboshop from mk4, which stays in place as the rollback. Deliberately no stripPrefix:
+# the Istio VirtualService removes /roboshop, and stripping it here too would break every route. TLS uses the shared
+# default TLSStore in namespace jithendar. Plain HTTP keeps redirecting through the roboshop-http Ingress.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: roboshop-eks
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - kind: Rule
+    match: Host(`jithendar.com`) && (Path(`/roboshop`) || PathPrefix(`/roboshop/`))
+    priority: 1000
+    services:
+    - name: roboshop-eks-origin
+      port: 443
+      scheme: https
+      serversTransport: roboshop-eks-origin
+      passHostHeader: true
+  tls: {}

@@ -1,0 +1,12 @@
+# roboshop-origin.jithendar.com is a DNS-only CNAME to the NLB, created by hand once the NLB exists, so the generated
+# load balancer name stays out of Git. Needs providers.kubernetesCRD.allowExternalNameServices in Traefik.
+apiVersion: v1
+kind: Service
+metadata:
+  name: roboshop-eks-origin
+spec:
+  type: ExternalName
+  externalName: roboshop-origin.jithendar.com
+  ports:
+  - name: https
+    port: 443

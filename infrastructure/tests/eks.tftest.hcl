@@ -268,3 +268,75 @@ run "ebs_csi_driver" {
     error_message = "The driver must create a default StorageClass and use its controller service account."
   }
 }
+
+run "ingress_off_by_default" {
+  command = plan
+  variables {
+    eks_enabled              = true
+    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
+  }
+  assert {
+    condition     = length(helm_release.aws_load_balancer_controller) == 0 && length(helm_release.istio_ingressgateway) == 0 && length(aws_iam_role.eks_load_balancer_controller) == 0
+    error_message = "A push to master must not create a billed NLB until ingress is explicitly enabled."
+  }
+}
+run "ingress_needs_eks" {
+  command = plan
+  variables {
+    eks_ingress_enabled      = true
+    eks_ingress_source_cidrs = ["203.0.113.10/32"]
+  }
+  assert {
+    condition     = length(helm_release.aws_load_balancer_controller) == 0 && length(helm_release.istiod) == 0
+    error_message = "Ingress installs nothing without a cluster."
+  }
+}
+run "ingress_nlb_is_https_only_and_restricted" {
+  command = plan
+  # The subnet IDs in these values are otherwise unknown at plan.
+  override_resource {
+    target          = aws_subnet.vpc_public_subnets
+    override_during = plan
+    values          = { id = "subnet-public" }
+  }
+  variables {
+    eks_enabled              = true
+    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
+    eks_ingress_enabled      = true
+    eks_ingress_source_cidrs = ["203.0.113.10/32"]
+  }
+  assert {
+    condition     = [for p in yamldecode(helm_release.istio_ingressgateway[0].values[0]).service.ports : p.port] == [443]
+    error_message = "Only 443 may be a listener: 15021 and metrics stay private."
+  }
+  assert {
+    condition     = yamldecode(helm_release.istio_ingressgateway[0].values[0]).service.loadBalancerSourceRanges == ["203.0.113.10/32"]
+    error_message = "The NLB must be limited to the configured sources."
+  }
+  assert {
+    condition     = yamldecode(helm_release.istio_ingressgateway[0].values[0]).service.loadBalancerClass == "service.k8s.aws/nlb"
+    error_message = "The gateway Service must be reconciled by the AWS Load Balancer Controller."
+  }
+  assert {
+    condition     = !can(yamldecode(helm_release.istio_ingressgateway[0].values[0]).service.annotations["service.beta.kubernetes.io/aws-load-balancer-ssl-cert"])
+    error_message = "TLS must terminate on the gateway, not on the NLB."
+  }
+  assert {
+    condition     = aws_eks_pod_identity_association.load_balancer_controller[0].service_account == "aws-load-balancer-controller" && aws_eks_pod_identity_association.load_balancer_controller[0].namespace == "kube-system"
+    error_message = "The controller's identity must bind to its own ServiceAccount."
+  }
+}
+run "ingress_rejects_open_sources" {
+  command = plan
+  variables { eks_ingress_source_cidrs = ["0.0.0.0/0"] }
+  expect_failures = [var.eks_ingress_source_cidrs]
+}
+run "ingress_requires_sources" {
+  command = plan
+  variables {
+    eks_enabled              = true
+    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
+    eks_ingress_enabled      = true
+  }
+  expect_failures = [helm_release.istio_ingressgateway]
+}

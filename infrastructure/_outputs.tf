@@ -88,3 +88,8 @@ output "ses_smtp" {
     identity_arn = aws_sesv2_email_identity.store[0].arn
   } : null
 }
+
+output "eks_load_balancer_controller_role_arn" {
+  description = "Pod Identity role of the AWS Load Balancer Controller; null when eks_ingress_enabled is false."
+  value       = try(aws_iam_role.eks_load_balancer_controller[0].arn, null)
+}

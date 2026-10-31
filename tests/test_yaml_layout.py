@@ -13,7 +13,7 @@ APP = checkout(APP_REPO)  # roboshop-ai: microservices and their manifests
 
 def active_yaml():
     # Do not rewrite historical upstream source or installed dependencies.
-    bases=[ARGOCD,ROOT/'minikube',ROOT/'observability',APP/'services',APP/'tests/load',APP/'.github']
+    bases=[ARGOCD,ROOT/'eks',ROOT/'minikube',ROOT/'observability',APP/'services',APP/'tests/load',APP/'.github']
     for base in bases:
         assert base.is_dir(),base
         for p in base.rglob('*'):
@@ -40,7 +40,7 @@ def test_each_local_chart_template_renders_at_most_one_resource():
 
 
 def test_local_kustomize_references_exist():
-    for base in (ROOT/'minikube',APP/'services',ROOT/'observability'):
+    for base in (ROOT/'eks',ROOT/'minikube',APP/'services',ROOT/'observability'):
         for path in base.rglob('kustomization.yaml'):
             if any(x in path.parts for x in ('node_modules','.venv')):continue
             for resource in yaml.safe_load(path.read_text()).get('resources',[]):

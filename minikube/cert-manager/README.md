@@ -101,3 +101,5 @@ kubectl --context roboshop-demo -n cert-manager create secret generic cloudflare
   --from-literal=api-token="$CF_TOKEN"
 unset CF_TOKEN
 ```
+
+The certificate these issue on EKS is [`eks/roboshop-demo/ingress/jithendar-com-certificate.yaml`](../../eks/roboshop-demo/ingress/jithendar-com-certificate.yaml), for the Istio gateway.

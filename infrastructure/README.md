@@ -155,6 +155,11 @@ add-ons, Karpenter, Istio, Gatekeeper, KEDA, observability and Argo CD, with its
 That stack creates its own VPC; nothing here is reused except, optionally, these ECR
 repositories.
 
+The `roboshop-demo` cluster in this stack adds the AWS Load Balancer Controller and Istio when `eks_ingress_enabled = true`
+([`eks-ingress.tf`](eks-ingress.tf), design in [eks/README.md](../eks/README.md)). It stays off by default because a push to
+`master` applies with no review, and it creates a billed internet-facing NLB. Follow [eks/RUNBOOK.md](../eks/RUNBOOK.md).
+`policies/` holds the upstream controller IAM policy for the pinned version; replace it when the chart moves.
+
 ## Amazon SES transactional email
 
 `ses.tf` provisions the `jithendar.com` SES identity with 2048-bit Easy DKIM, a

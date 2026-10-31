@@ -1,0 +1,9 @@
+# Applies to sidecars only: the data stores run without one and are unaffected. No DestinationRule is needed, because
+# auto mTLS already picks mTLS for meshed endpoints and plaintext for the data stores.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+spec:
+  mtls:
+    mode: PERMISSIVE

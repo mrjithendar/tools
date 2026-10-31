@@ -1,0 +1,478 @@
+diff --git a/argocd-eks/README.md b/argocd-eks/README.md
+index d5fa0e7..caf1b3b 100644
+--- a/argocd-eks/README.md
++++ b/argocd-eks/README.md
+@@ -11,15 +11,17 @@ Like mk4, they use manual sync, no finalizers, and must never be synced with pru
+ 
+ | Applications | Source |
+ | --- | --- |
+-| cart-service, catalogue-service, currency-service, mcp-server, moks, payment-service, redis, shipping-service, user-service, web | The `services/<service>` manifests, unchanged. |
+-| ai-gateway, kafka-bridge, postgres, rabbitmq | The same manifests with the mk4 `nodeSelector` removed by an inline Kustomize patch. |
++| cart-service, catalogue-service, currency-service, mcp-server, moks, payment-service, shipping-service, user-service, web | The `services/<service>` manifests with a mesh ServiceAccount set by an inline Kustomize patch. |
++| ai-gateway | The same, plus the mk4 `nodeSelector` removed and its Service port declared as TCP. |
++| kafka-bridge, postgres, rabbitmq | The same manifests with the mk4 `nodeSelector` removed and the sidecar turned off. |
++| redis | The `services/redis` manifests with the sidecar turned off. |
+ | mongodb | The StatefulSet in `apps/data`, plus the catalog ConfigMap from tools. |
+ | roboshop-config | Namespace and ConfigMap from tools. |
+ | storage | The default `gp3-encrypted` StorageClass. |
+ 
+-There is no ingress: nothing here is reachable from outside the cluster. The `deploy/eks/k8s/argocd`
+-layers are a different design that needs Istio, Gatekeeper, Karpenter and External Secrets, none of
+-which this cluster runs.
++Ingress, TLS, mesh identities and policies live in `tools/eks` ([README](https://github.com/mrjithendar/tools/blob/master/eks/README.md));
++Applications here only reference the ServiceAccounts. The `deploy/eks/k8s/argocd` layers are a
++different design that needs Gatekeeper, Karpenter and External Secrets, which this cluster does not run.
+ 
+ ## Prerequisites
+ 
+diff --git a/argocd-eks/ai-gateway.yaml b/argocd-eks/ai-gateway.yaml
+index 93d6c92..ff1f86a 100644
+--- a/argocd-eks/ai-gateway.yaml
++++ b/argocd-eks/ai-gateway.yaml
+@@ -30,3 +30,15 @@ spec:
+         patch: |-
+           - op: remove
+             path: /spec/template/spec/nodeSelector
++          - op: add
++            path: /spec/template/spec/serviceAccountName
++            value: ai-gateway
++      # web preserves the browser's Host header, which a sidecar treating this port as HTTP cannot match to a Service:
++      # it would fall through to plaintext passthrough and fail under STRICT mTLS. As TCP the connection is simply mTLS.
++      - target:
++          kind: Service
++          name: ai-gateway
++        patch: |-
++          - op: add
++            path: /spec/ports/0/appProtocol
++            value: tcp
+diff --git a/argocd-eks/cart-service.yaml b/argocd-eks/cart-service.yaml
+index 1621da3..1ca8c54 100644
+--- a/argocd-eks/cart-service.yaml
++++ b/argocd-eks/cart-service.yaml
+@@ -17,9 +17,17 @@ spec:
+     - FailOnSharedResource=true
+     - PruneLast=true
+     - CreateNamespace=true
++  # Mesh identity: the ServiceAccount comes from tools/eks/roboshop-demo/mesh.
+   source:
+     repoURL: https://github.com/mrjithendar/roboshop-ai.git
+     targetRevision: master
+     path: services/cart-service
+-    directory:
+-      include: '{cart-service-service-minikube.yaml,cart-service-deployment-minikube.yaml}'
++    kustomize:
++      patches:
++      - target:
++          kind: Deployment
++          name: cart-service
++        patch: |-
++          - op: add
++            path: /spec/template/spec/serviceAccountName
++            value: cart-service
+diff --git a/argocd-eks/catalogue-service.yaml b/argocd-eks/catalogue-service.yaml
+index 62f8751..0867b67 100644
+--- a/argocd-eks/catalogue-service.yaml
++++ b/argocd-eks/catalogue-service.yaml
+@@ -17,9 +17,17 @@ spec:
+     - FailOnSharedResource=true
+     - PruneLast=true
+     - CreateNamespace=true
++  # Mesh identity: the ServiceAccount comes from tools/eks/roboshop-demo/mesh.
+   source:
+     repoURL: https://github.com/mrjithendar/roboshop-ai.git
+     targetRevision: master
+     path: services/catalogue-service
+-    directory:
+-      include: '{catalogue-service-service-minikube.yaml,catalogue-service-deployment-minikube.yaml}'
++    kustomize:
++      patches:
++      - target:
++          kind: Deployment
++          name: catalogue-service
++        patch: |-
++          - op: add
++            path: /spec/template/spec/serviceAccountName
++            value: catalogue-service
+diff --git a/argocd-eks/currency-service.yaml b/argocd-eks/currency-service.yaml
+index 9cc86a0..95c921a 100644
+--- a/argocd-eks/currency-service.yaml
++++ b/argocd-eks/currency-service.yaml
+@@ -17,9 +17,17 @@ spec:
+     - FailOnSharedResource=true
+     - PruneLast=true
+     - CreateNamespace=true
++  # Mesh identity: the ServiceAccount comes from tools/eks/roboshop-demo/mesh.
+   source:
+     repoURL: https://github.com/mrjithendar/roboshop-ai.git
+     targetRevision: master
+     path: services/currency-service
+-    directory:
+-      include: '{currency-service-service-minikube.yaml,currency-service-deployment-minikube.yaml}'
++    kustomize:
++      patches:
++      - target:
++          kind: Deployment
++          name: currency-service
++        patch: |-
++          - op: add
++            path: /spec/template/spec/serviceAccountName
++            value: currency-service
+diff --git a/argocd-eks/kafka-bridge.yaml b/argocd-eks/kafka-bridge.yaml
+index 10f3197..4180b55 100644
+--- a/argocd-eks/kafka-bridge.yaml
++++ b/argocd-eks/kafka-bridge.yaml
+@@ -30,3 +30,6 @@ spec:
+         patch: |-
+           - op: remove
+             path: /spec/template/spec/nodeSelector
++          - op: add
++            path: /spec/template/metadata/labels/sidecar.istio.io~1inject
++            value: "false"
+diff --git a/argocd-eks/mcp-server.yaml b/argocd-eks/mcp-server.yaml
+index 4bbc75f..5fb053b 100644
+--- a/argocd-eks/mcp-server.yaml
++++ b/argocd-eks/mcp-server.yaml
+@@ -17,9 +17,17 @@ spec:
+     - FailOnSharedResource=true
+     - PruneLast=true
+     - CreateNamespace=true
++  # Mesh identity: the ServiceAccount comes from tools/eks/roboshop-demo/mesh.
+   source:
+     repoURL: https://github.com/mrjithendar/roboshop-ai.git
+     targetRevision: master
+     path: services/mcp-server
+-    directory:
+-      include: '{mcp-server-service-minikube.yaml,mcp-server-deployment-minikube.yaml,mcp-server-network-policy-minikube.yaml}'
++    kustomize:
++      patches:
++      - target:
++          kind: Deployment
++          name: mcp-server
++        patch: |-
++          - op: add
++            path: /spec/template/spec/serviceAccountName
++            value: mcp-server
+diff --git a/argocd-eks/moks.yaml b/argocd-eks/moks.yaml
+index d0813fa..4c668e2 100644
+--- a/argocd-eks/moks.yaml
++++ b/argocd-eks/moks.yaml
+@@ -17,9 +17,17 @@ spec:
+     - FailOnSharedResource=true
+     - PruneLast=true
+     - CreateNamespace=true
++  # Mesh identity: the ServiceAccount comes from tools/eks/roboshop-demo/mesh.
+   source:
+     repoURL: https://github.com/mrjithendar/roboshop-ai.git
+     targetRevision: master
+     path: services/moks
+-    directory:
+-      include: '{moks-service-minikube.yaml,moks-deployment-minikube.yaml}'
++    kustomize:
++      patches:
++      - target:
++          kind: Deployment
++          name: moks
++        patch: |-
++          - op: add
++            path: /spec/template/spec/serviceAccountName
++            value: moks
+diff --git a/argocd-eks/payment-service.yaml b/argocd-eks/payment-service.yaml
+index 4957874..d277b75 100644
+--- a/argocd-eks/payment-service.yaml
++++ b/argocd-eks/payment-service.yaml
+@@ -17,9 +17,17 @@ spec:
+     - FailOnSharedResource=true
+     - PruneLast=true
+     - CreateNamespace=true
++  # Mesh identity: the ServiceAccount comes from tools/eks/roboshop-demo/mesh.
+   source:
+     repoURL: https://github.com/mrjithendar/roboshop-ai.git
+     targetRevision: master
+     path: services/payment-service
+-    directory:
+-      include: '{payment-service-service-minikube.yaml,payment-service-deployment-minikube.yaml}'
++    kustomize:
++      patches:
++      - target:
++          kind: Deployment
++          name: payment-service
++        patch: |-
++          - op: add
++            path: /spec/template/spec/serviceAccountName
++            value: payment-service
+diff --git a/argocd-eks/postgres.yaml b/argocd-eks/postgres.yaml
+index f801fca..b6e29dd 100644
+--- a/argocd-eks/postgres.yaml
++++ b/argocd-eks/postgres.yaml
+@@ -31,3 +31,16 @@ spec:
+         patch: |-
+           - op: remove
+             path: /spec/template/spec/nodeSelector
++          - op: add
++            path: /spec/template/metadata/labels/sidecar.istio.io~1inject
++            value: "false"
++      # One-shot import hook that only talks to shipping-db, which is outside the mesh.
++      - target:
++          kind: Job
++          name: shipping-location-import
++        patch: |-
++          - op: add
++            path: /spec/template/metadata
++            value:
++              labels:
++                sidecar.istio.io/inject: "false"
+diff --git a/argocd-eks/rabbitmq.yaml b/argocd-eks/rabbitmq.yaml
+index 3e357d3..cd53890 100644
+--- a/argocd-eks/rabbitmq.yaml
++++ b/argocd-eks/rabbitmq.yaml
+@@ -30,3 +30,6 @@ spec:
+         patch: |-
+           - op: remove
+             path: /spec/template/spec/nodeSelector
++          - op: add
++            path: /spec/template/metadata/labels/sidecar.istio.io~1inject
++            value: "false"
+diff --git a/argocd-eks/redis.yaml b/argocd-eks/redis.yaml
+index 9a63777..c7ced17 100644
+--- a/argocd-eks/redis.yaml
++++ b/argocd-eks/redis.yaml
+@@ -17,9 +17,17 @@ spec:
+     - FailOnSharedResource=true
+     - PruneLast=true
+     - CreateNamespace=true
++  # Stays out of the mesh; see tools/eks/README.md.
+   source:
+     repoURL: https://github.com/mrjithendar/roboshop-ai.git
+     targetRevision: master
+     path: services/redis
+-    directory:
+-      include: '{redis-service-minikube.yaml,redis-deployment-minikube.yaml}'
++    kustomize:
++      patches:
++      - target:
++          kind: Deployment
++          name: redis
++        patch: |-
++          - op: add
++            path: /spec/template/metadata/labels/sidecar.istio.io~1inject
++            value: "false"
+diff --git a/argocd-eks/roboshop-config.yaml b/argocd-eks/roboshop-config.yaml
+index 3d4eff7..01a41e5 100644
+--- a/argocd-eks/roboshop-config.yaml
++++ b/argocd-eks/roboshop-config.yaml
+@@ -17,10 +17,19 @@ spec:
+     - FailOnSharedResource=true
+     - PruneLast=true
+     - CreateNamespace=true
+-  # Namespace and ConfigMap only: the Traefik ingress and middleware files stay on mk4.
++  # Namespace and ConfigMap only: the Traefik ingress and middleware files stay on mk4. Enrolls this namespace in the
++  # EKS mesh; data stores opt out per pod. mk4 has no Istio and reads the same files without this patch.
+   source:
+     repoURL: https://github.com/mrjithendar/tools.git
+     targetRevision: master
+     path: minikube/roboshop
+-    directory:
+-      include: '{roboshop-ai-namespace.yaml,roboshop-config-configmap.yaml}'
++    kustomize:
++      patches:
++      - target:
++          kind: Namespace
++          name: roboshop-ai
++        patch: |-
++          - op: add
++            path: /metadata/labels
++            value:
++              istio-injection: enabled
+diff --git a/argocd-eks/shipping-service.yaml b/argocd-eks/shipping-service.yaml
+index 733d495..dc84145 100644
+--- a/argocd-eks/shipping-service.yaml
++++ b/argocd-eks/shipping-service.yaml
+@@ -17,9 +17,17 @@ spec:
+     - FailOnSharedResource=true
+     - PruneLast=true
+     - CreateNamespace=true
++  # Mesh identity: the ServiceAccount comes from tools/eks/roboshop-demo/mesh.
+   source:
+     repoURL: https://github.com/mrjithendar/roboshop-ai.git
+     targetRevision: master
+     path: services/shipping-service
+-    directory:
+-      include: '{shipping-service-service-minikube.yaml,shipping-service-deployment-minikube.yaml}'
++    kustomize:
++      patches:
++      - target:
++          kind: Deployment
++          name: shipping-service
++        patch: |-
++          - op: add
++            path: /spec/template/spec/serviceAccountName
++            value: shipping-service
+diff --git a/argocd-eks/user-service.yaml b/argocd-eks/user-service.yaml
+index 98244be..b4b5623 100644
+--- a/argocd-eks/user-service.yaml
++++ b/argocd-eks/user-service.yaml
+@@ -17,9 +17,17 @@ spec:
+     - FailOnSharedResource=true
+     - PruneLast=true
+     - CreateNamespace=true
++  # Mesh identity: the ServiceAccount comes from tools/eks/roboshop-demo/mesh.
+   source:
+     repoURL: https://github.com/mrjithendar/roboshop-ai.git
+     targetRevision: master
+     path: services/user-service
+-    directory:
+-      include: '{user-service-service-minikube.yaml,user-service-deployment-minikube.yaml}'
++    kustomize:
++      patches:
++      - target:
++          kind: Deployment
++          name: user-service
++        patch: |-
++          - op: add
++            path: /spec/template/spec/serviceAccountName
++            value: user-service
+diff --git a/argocd-eks/web.yaml b/argocd-eks/web.yaml
+index 8360067..0f10040 100644
+--- a/argocd-eks/web.yaml
++++ b/argocd-eks/web.yaml
+@@ -17,9 +17,17 @@ spec:
+     - FailOnSharedResource=true
+     - PruneLast=true
+     - CreateNamespace=true
++  # Mesh identity: the ServiceAccount comes from tools/eks/roboshop-demo/mesh.
+   source:
+     repoURL: https://github.com/mrjithendar/roboshop-ai.git
+     targetRevision: master
+     path: services/web
+-    directory:
+-      include: '{web-service-minikube.yaml,web-deployment-minikube.yaml}'
++    kustomize:
++      patches:
++      - target:
++          kind: Deployment
++          name: web
++        patch: |-
++          - op: add
++            path: /spec/template/spec/serviceAccountName
++            value: web
+diff --git a/services/cart-service/kustomization.yaml b/services/cart-service/kustomization.yaml
+new file mode 100644
+index 0000000..322a5ac
+--- /dev/null
++++ b/services/cart-service/kustomization.yaml
+@@ -0,0 +1,6 @@
++# Used by argocd-eks only; the mk4 Application selects these files with directory.include.
++apiVersion: kustomize.config.k8s.io/v1beta1
++kind: Kustomization
++resources:
++- cart-service-service-minikube.yaml
++- cart-service-deployment-minikube.yaml
+diff --git a/services/catalogue-service/kustomization.yaml b/services/catalogue-service/kustomization.yaml
+new file mode 100644
+index 0000000..2ec8f2e
+--- /dev/null
++++ b/services/catalogue-service/kustomization.yaml
+@@ -0,0 +1,6 @@
++# Used by argocd-eks only; the mk4 Application selects these files with directory.include.
++apiVersion: kustomize.config.k8s.io/v1beta1
++kind: Kustomization
++resources:
++- catalogue-service-service-minikube.yaml
++- catalogue-service-deployment-minikube.yaml
+diff --git a/services/currency-service/kustomization.yaml b/services/currency-service/kustomization.yaml
+new file mode 100644
+index 0000000..dd5ad20
+--- /dev/null
++++ b/services/currency-service/kustomization.yaml
+@@ -0,0 +1,6 @@
++# Used by argocd-eks only; the mk4 Application selects these files with directory.include.
++apiVersion: kustomize.config.k8s.io/v1beta1
++kind: Kustomization
++resources:
++- currency-service-service-minikube.yaml
++- currency-service-deployment-minikube.yaml
+diff --git a/services/mcp-server/kustomization.yaml b/services/mcp-server/kustomization.yaml
+new file mode 100644
+index 0000000..f7a7091
+--- /dev/null
++++ b/services/mcp-server/kustomization.yaml
+@@ -0,0 +1,7 @@
++# Used by argocd-eks only; the mk4 Application selects these files with directory.include.
++apiVersion: kustomize.config.k8s.io/v1beta1
++kind: Kustomization
++resources:
++- mcp-server-service-minikube.yaml
++- mcp-server-deployment-minikube.yaml
++- mcp-server-network-policy-minikube.yaml
+diff --git a/services/moks/kustomization.yaml b/services/moks/kustomization.yaml
+new file mode 100644
+index 0000000..f205287
+--- /dev/null
++++ b/services/moks/kustomization.yaml
+@@ -0,0 +1,6 @@
++# Used by argocd-eks only; the mk4 Application selects these files with directory.include.
++apiVersion: kustomize.config.k8s.io/v1beta1
++kind: Kustomization
++resources:
++- moks-service-minikube.yaml
++- moks-deployment-minikube.yaml
+diff --git a/services/payment-service/kustomization.yaml b/services/payment-service/kustomization.yaml
+new file mode 100644
+index 0000000..723dc98
+--- /dev/null
++++ b/services/payment-service/kustomization.yaml
+@@ -0,0 +1,6 @@
++# Used by argocd-eks only; the mk4 Application selects these files with directory.include.
++apiVersion: kustomize.config.k8s.io/v1beta1
++kind: Kustomization
++resources:
++- payment-service-service-minikube.yaml
++- payment-service-deployment-minikube.yaml
+diff --git a/services/redis/kustomization.yaml b/services/redis/kustomization.yaml
+new file mode 100644
+index 0000000..0bafdb5
+--- /dev/null
++++ b/services/redis/kustomization.yaml
+@@ -0,0 +1,6 @@
++# Used by argocd-eks only; the mk4 Application selects these files with directory.include.
++apiVersion: kustomize.config.k8s.io/v1beta1
++kind: Kustomization
++resources:
++- redis-service-minikube.yaml
++- redis-deployment-minikube.yaml
+diff --git a/services/shipping-service/kustomization.yaml b/services/shipping-service/kustomization.yaml
+new file mode 100644
+index 0000000..a141a7a
+--- /dev/null
++++ b/services/shipping-service/kustomization.yaml
+@@ -0,0 +1,6 @@
++# Used by argocd-eks only; the mk4 Application selects these files with directory.include.
++apiVersion: kustomize.config.k8s.io/v1beta1
++kind: Kustomization
++resources:
++- shipping-service-service-minikube.yaml
++- shipping-service-deployment-minikube.yaml
+diff --git a/services/user-service/kustomization.yaml b/services/user-service/kustomization.yaml
+new file mode 100644
+index 0000000..3e71618
+--- /dev/null
++++ b/services/user-service/kustomization.yaml
+@@ -0,0 +1,6 @@
++# Used by argocd-eks only; the mk4 Application selects these files with directory.include.
++apiVersion: kustomize.config.k8s.io/v1beta1
++kind: Kustomization
++resources:
++- user-service-service-minikube.yaml
++- user-service-deployment-minikube.yaml
+diff --git a/services/web/kustomization.yaml b/services/web/kustomization.yaml
+new file mode 100644
+index 0000000..4297164
+--- /dev/null
++++ b/services/web/kustomization.yaml
+@@ -0,0 +1,6 @@
++# Used by argocd-eks only; the mk4 Application selects these files with directory.include.
++apiVersion: kustomize.config.k8s.io/v1beta1
++kind: Kustomization
++resources:
++- web-service-minikube.yaml
++- web-deployment-minikube.yaml

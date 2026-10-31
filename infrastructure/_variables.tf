@@ -248,3 +248,19 @@ variable "eks_prometheus_remote_write_url" {
     error_message = "Use an https:// URL: the write password is sent with every request."
   }
 }
+
+variable "eks_ingress_enabled" {
+  description = "Install the AWS Load Balancer Controller and Istio, which creates a billed internet-facing NLB. Follow eks/RUNBOOK.md."
+  type        = bool
+  default     = false
+}
+
+variable "eks_ingress_source_cidrs" {
+  description = "IPv4 CIDRs allowed to reach the NLB on 443. Required with eks_ingress_enabled; mk4's edge and admin addresses, not the Internet."
+  type        = list(string)
+  default     = []
+  validation {
+    condition     = alltrue([for c in var.eks_ingress_source_cidrs : can(cidrnetmask(c)) && !endswith(c, "/0")])
+    error_message = "Use restricted IPv4 CIDRs: the public path reaches the NLB through the edge on mk4."
+  }
+}

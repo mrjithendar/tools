@@ -1,0 +1,58 @@
+%% RoboShop on EKS: where public TLS terminates and where mesh mTLS begins.
+%% Edit here, then copy it into eks/README.md, which GitHub renders; a test keeps the two equal.
+flowchart TD
+  browser["Browser"]
+
+  subgraph mk4["mk4 (jithendar.com resolves here)"]
+    traefik["Traefik<br/>only /roboshop goes to EKS<br/>/, /grafana, /argocd and the rest stay here"]
+  end
+
+  subgraph aws["AWS: roboshop-demo VPC"]
+    nlb["Internet-facing NLB<br/>TCP 443 passthrough, IP targets<br/>sources limited to the edge and admin"]
+
+    subgraph ingress["istio-ingress"]
+      gateway["Istio ingress gateway<br/>strips /roboshop, routes only /roboshop/*"]
+    end
+
+    subgraph ns["roboshop-ai (STRICT mTLS, identity policies)"]
+      web["web (NGINX + storefront)"]
+      aigw["ai-gateway"]
+      moks["moks"]
+      mcp["mcp-server<br/>no in-mesh callers"]
+      user["user-service"]
+      catalogue["catalogue-service"]
+      cart["cart-service"]
+      payment["payment-service"]
+      shipping["shipping-service"]
+      currency["currency-service"]
+    end
+
+    subgraph data["roboshop-ai: outside the mesh"]
+      stores[("MongoDB, Redis, PostgreSQL,<br/>RabbitMQ, Kafka")]
+    end
+  end
+
+  browser -- "HTTPS: public TLS 1 terminates at Traefik" --> traefik
+  traefik -- "HTTPS: public TLS 2, certificate verified" --> nlb
+  nlb -- "TCP, still the same TLS session" --> gateway
+  gateway == "public TLS 2 terminates here; mesh mTLS begins" ==> web
+  web == mTLS ==> aigw
+  web == mTLS ==> moks
+  web == mTLS ==> currency
+  aigw == mTLS ==> user
+  aigw == mTLS ==> catalogue
+  aigw == mTLS ==> cart
+  aigw == mTLS ==> payment
+  aigw == mTLS ==> shipping
+  aigw == mTLS ==> currency
+  aigw == mTLS ==> moks
+  moks == mTLS ==> aigw
+  moks == mTLS ==> catalogue
+  moks == mTLS ==> user
+  user == mTLS ==> shipping
+  mcp == mTLS ==> aigw
+  aigw -. "plaintext, password auth" .-> stores
+  user -.-> stores
+  catalogue -.-> stores
+  cart -.-> stores
+  shipping -.-> stores

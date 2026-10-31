@@ -1,0 +1,19 @@
+# The NLB only forwards TCP, so this is where TLS ends. Port 443 only: the NLB has no port 80 listener.
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: public
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    - jithendar.com
+    tls:
+      mode: SIMPLE
+      credentialName: jithendar-com-tls
+      minProtocolVersion: TLSV1_2

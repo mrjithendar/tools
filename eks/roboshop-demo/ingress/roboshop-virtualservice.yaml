@@ -1,0 +1,34 @@
+# The one place /roboshop is stripped. The edge passes the path through unchanged and web expects it gone: its
+# FRONTEND_BASE_PATH=/roboshop only rewrites HTML attributes. Anything else on this host has no route and gets a 404, so
+# this cannot capture the rest of jithendar.com, and internal services such as mcp-server have no public path at all.
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: roboshop
+spec:
+  hosts:
+  - jithendar.com
+  gateways:
+  - public
+  http:
+  # The query string is kept: Envoy only replaces the path.
+  - name: trailing-slash
+    match:
+    - uri:
+        exact: /roboshop
+    redirect:
+      uri: /roboshop/
+      redirectCode: 308
+  - name: storefront
+    match:
+    - uri:
+        prefix: /roboshop/
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: web.roboshop-ai.svc.cluster.local
+        port:
+          number: 8080
+    # No timeout field, which is Istio's "no overall deadline": NGINX in web already bounds each upstream read, and a route
+    # timeout would cut off a long Moks answer or any later streaming response.

@@ -1,0 +1,23 @@
+# ServiceAccounts and mesh policy on EKS. Sync before the workloads that use the ServiceAccounts.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: roboshop-demo-mesh
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: roboshop-gitops
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  project: platform
+  destination:
+    name: roboshop-demo
+    namespace: roboshop-ai
+  syncPolicy:
+    syncOptions:
+    - FailOnSharedResource=true
+    - PruneLast=true
+  source:
+    repoURL: https://github.com/mrjithendar/tools.git
+    targetRevision: master
+    path: eks/roboshop-demo/mesh

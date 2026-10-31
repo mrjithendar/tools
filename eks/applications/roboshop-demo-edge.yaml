@@ -1,0 +1,23 @@
+# Runs on mk4, not EKS. Syncing it moves public /roboshop traffic to EKS, so leave it until RUNBOOK.md says so.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: roboshop-demo-edge
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: roboshop-gitops
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  project: platform
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: roboshop-ai
+  syncPolicy:
+    syncOptions:
+    - FailOnSharedResource=true
+    - PruneLast=true
+  source:
+    repoURL: https://github.com/mrjithendar/tools.git
+    targetRevision: master
+    path: eks/edge

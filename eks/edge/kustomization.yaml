@@ -1,0 +1,9 @@
+# On mk4: sends /roboshop from Traefik to the NLB in front of EKS. Syncing this is the cutover; deleting the IngressRoute
+# is the rollback (RUNBOOK.md). Nothing else on jithendar.com goes through it.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: roboshop-ai
+resources:
+- roboshop-eks-origin-service.yaml
+- roboshop-eks-origin-serverstransport.yaml
+- roboshop-eks-ingressroute.yaml
