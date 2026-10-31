@@ -78,3 +78,23 @@ resource "aws_iam_role_policy_attachment" "eks_fargate" {
   role       = aws_iam_role.eks_fargate[0].name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
 }
+
+# Lets the Network Flow Monitor agent publish flow data, through EKS Pod Identity.
+resource "aws_iam_role" "eks_network_flow_monitor" {
+  count = local.eks_network_observability_enabled ? 1 : 0
+  name  = "${local.eks_name}-network-flow-monitor"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = ["sts:AssumeRole", "sts:TagSession"]
+      Principal = { Service = "pods.eks.amazonaws.com" }
+    }]
+  })
+  tags = local.common_tags
+}
+resource "aws_iam_role_policy_attachment" "eks_network_flow_monitor" {
+  count      = local.eks_network_observability_enabled ? 1 : 0
+  role       = aws_iam_role.eks_network_flow_monitor[0].name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchNetworkFlowMonitorAgentPublishPolicy"
+}

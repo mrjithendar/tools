@@ -1,4 +1,9 @@
+mock_provider "helm" {}
+
 mock_provider "aws" {
+  mock_data "aws_caller_identity" {
+    defaults = { account_id = "123456789012" }
+  }
   mock_data "aws_eks_addon_version" {
     defaults = { version = "v1.0.0-eksbuild.1" }
   }
@@ -100,4 +105,52 @@ run "reject_six_fargate_namespaces" {
     eks_fargate_namespaces = ["a", "b", "c", "d", "e", "f"]
   }
   expect_failures = [var.eks_fargate_namespaces]
+}
+
+run "network_observability_off_by_default" {
+  command = plan
+  variables {
+    eks_enabled              = true
+    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
+  }
+  assert {
+    condition     = length(aws_networkflowmonitor_monitor.main) == 0 && length(aws_eks_addon.network_flow_monitor) == 0
+    error_message = "Network observability must be opt-in."
+  }
+}
+
+run "network_observability_enabled" {
+  command = plan
+  variables {
+    eks_enabled                       = true
+    eks_admin_principal_arns          = ["arn:aws:iam::123456789012:role/admin"]
+    eks_network_observability_enabled = true
+  }
+  assert {
+    condition     = length(aws_networkflowmonitor_scope.main) == 1 && length(aws_networkflowmonitor_monitor.main) == 1 && one(aws_eks_addon.network_flow_monitor[0].pod_identity_association).service_account == "aws-network-flow-monitor-agent-service-account"
+    error_message = "The scope, monitor and agent must be created together, with the agent's service account."
+  }
+}
+
+run "network_observability_needs_eks" {
+  command = plan
+  variables {
+    eks_network_observability_enabled = true
+  }
+  assert {
+    condition     = length(aws_networkflowmonitor_scope.main) == 0
+    error_message = "Network observability must not be created without a cluster."
+  }
+}
+
+run "observability_addons" {
+  command = plan
+  variables {
+    eks_enabled              = true
+    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
+  }
+  assert {
+    condition     = toset(keys(aws_eks_addon.observability)) == toset(["cert-manager", "eks-node-monitoring-agent", "fluent-bit", "kube-state-metrics", "prometheus-node-exporter"]) && length(aws_eks_addon.adot) == 1
+    error_message = "All observability add-ons must install with the cluster; adot is separate so it can wait for cert-manager."
+  }
 }

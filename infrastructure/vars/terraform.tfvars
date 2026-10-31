@@ -21,3 +21,5 @@ eks_admin_principal_arns = [
 eks_public_access_cidrs = ["122.177.247.138/32", "46.224.38.14/32"]
 # Fargate is x86 only: keep arm64 service images out of these namespaces.
 eks_fargate_namespaces = ["fargate"]
+
+eks_network_observability_enabled = true

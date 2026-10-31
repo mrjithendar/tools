@@ -210,3 +210,9 @@ variable "eks_fargate_namespaces" {
     error_message = "Use up to five namespace names; * and ? wildcards are allowed."
   }
 }
+
+variable "eks_network_observability_enabled" {
+  description = "Enable EKS Container Network Observability: Network Flow Monitor scope, monitor and agent add-on. Billed per monitored node."
+  type        = bool
+  default     = false
+}
