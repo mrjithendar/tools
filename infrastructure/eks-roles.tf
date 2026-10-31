@@ -98,3 +98,29 @@ resource "aws_iam_role_policy_attachment" "eks_network_flow_monitor" {
   role       = aws_iam_role.eks_network_flow_monitor[0].name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchNetworkFlowMonitorAgentPublishPolicy"
 }
+
+# Lets the CloudWatch agent publish metrics, logs and traces, through EKS Pod Identity.
+resource "aws_iam_role" "eks_cloudwatch_observability" {
+  count = local.eks_cloudwatch_observability_enabled ? 1 : 0
+  name  = "${local.eks_name}-cloudwatch-observability"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = ["sts:AssumeRole", "sts:TagSession"]
+      Principal = { Service = "pods.eks.amazonaws.com" }
+    }]
+  })
+  tags = local.common_tags
+}
+resource "aws_iam_role_policy_attachment" "eks_cloudwatch_observability" {
+  for_each   = local.eks_cloudwatch_observability_enabled ? toset(["CloudWatchAgentServerPolicy", "AWSXrayWriteOnlyAccess"]) : toset([])
+  role       = aws_iam_role.eks_cloudwatch_observability[0].name
+  policy_arn = "arn:aws:iam::aws:policy/${each.value}"
+}
+
+# Account-wide, one per account: the "Start discovering Services" step for Application Signals.
+resource "aws_iam_service_linked_role" "application_signals" {
+  count            = local.eks_cloudwatch_observability_enabled ? 1 : 0
+  aws_service_name = "application-signals.cloudwatch.amazonaws.com"
+}

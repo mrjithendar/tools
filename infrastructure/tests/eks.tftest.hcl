@@ -201,3 +201,33 @@ run "network_observability_reuses_existing_scope" {
     error_message = "An existing scope must be reused, not created again."
   }
 }
+
+run "cloudwatch_observability_off_by_default" {
+  command = plan
+  variables {
+    eks_enabled              = true
+    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
+  }
+  assert {
+    condition     = length(aws_eks_addon.cloudwatch_observability) == 0 && length(aws_iam_service_linked_role.application_signals) == 0
+    error_message = "CloudWatch observability must be opt-in."
+  }
+}
+
+run "cloudwatch_observability_enables_all_three" {
+  command = plan
+  variables {
+    eks_enabled                          = true
+    eks_admin_principal_arns             = ["arn:aws:iam::123456789012:role/admin"]
+    eks_cloudwatch_observability_enabled = true
+  }
+  assert {
+    condition = alltrue([
+      jsondecode(aws_eks_addon.cloudwatch_observability[0].configuration_values).applicationSignals.enabled,
+      jsondecode(aws_eks_addon.cloudwatch_observability[0].configuration_values).containerInsights.enabled,
+      jsondecode(aws_eks_addon.cloudwatch_observability[0].configuration_values).otelContainerInsights.enabled,
+      one(aws_eks_addon.cloudwatch_observability[0].pod_identity_association).service_account == "cloudwatch-agent",
+    ])
+    error_message = "All three features must be on, with the agent's service account."
+  }
+}

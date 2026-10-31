@@ -12,6 +12,8 @@ ses_domain  = "jithendar.com"
 ecr_pull_principals = {}
 
 eks_enabled = true
+# t4g.medium stops at 17 Pods per node; the add-ons here need more. Changing this replaces the node group.
+eks_node_instance_types = ["t4g.large"]
 # The role is created by eks-roles.tf. Root is listed for the EKS console while the account has no IAM users.
 eks_admin_principal_arns = [
   "arn:aws:iam::881026659929:role/roboshop-demo-eks-admin",
@@ -27,3 +29,5 @@ eks_network_observability_enabled = true
 eks_network_flow_monitor_scope_arn = "arn:aws:networkflowmonitor:us-east-1:881026659929:scope/d894fc8f-92ab-4c38-a32a-04fb931bcbf1"
 
 eks_prometheus_remote_write_url = "https://jithendar.com/prometheus/api/v1/write"
+
+eks_cloudwatch_observability_enabled = true

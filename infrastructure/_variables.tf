@@ -227,6 +227,12 @@ variable "eks_network_flow_monitor_scope_arn" {
   }
 }
 
+variable "eks_cloudwatch_observability_enabled" {
+  description = "Install the CloudWatch add-on: Application Signals, Container Insights and OTel Container Insights. Billed by CloudWatch usage."
+  type        = bool
+  default     = false
+}
+
 variable "eks_prometheus_remote_write_url" {
   description = "Prometheus remote write endpoint for cluster metrics. Empty installs no agent."
   type        = string
