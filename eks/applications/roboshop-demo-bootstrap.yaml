@@ -1,0 +1,25 @@
+# Lives outside argocd/ because scripts/argocd/deploy.py only deploys to the local cluster: a remote destination in
+# that catalog would fail `./deploy-argocd.sh all`. Apply it with kubectl; see eks/README.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: roboshop-demo-bootstrap
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: roboshop-gitops
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  project: platform
+  destination:
+    name: roboshop-demo
+    namespace: roboshop-ai
+  syncPolicy:
+    syncOptions:
+    - FailOnSharedResource=true
+    - PruneLast=true
+    - CreateNamespace=true
+  source:
+    repoURL: https://github.com/mrjithendar/tools.git
+    targetRevision: master
+    path: eks/roboshop-demo

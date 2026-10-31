@@ -1,0 +1,7 @@
+# Gives Argo CD something to sync, so it connects to the EKS cluster and proves its login works.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: roboshop-demo-bootstrap
+data:
+  cluster: roboshop-demo

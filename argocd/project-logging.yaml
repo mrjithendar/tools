@@ -7,6 +7,7 @@ spec:
   sourceRepos:
   - https://github.com/mrjithendar/roboshop-ai.git
   - https://github.com/mrjithendar/tools.git
+  - https://github.com/mrjithendar/moks.git
   destinations:
   - namespace: monitoring
     server: https://kubernetes.default.svc
