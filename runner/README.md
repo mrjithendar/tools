@@ -37,7 +37,16 @@ with `repo`. The first one found is used:
 1. `GH_TOKEN` or `GITHUB_TOKEN` in the environment;
 2. the GitHub CLI login (`gh auth login`);
 3. the AWS Secrets Manager secret `mrjithendar-github-pat` in `us-east-1` (JSON key `github_token` or
-   `github_pat`, or the bare token), read with the host's AWS credentials.
+   `github_pat`, or the bare token), read with the host's AWS credentials. If the AWS CLI is missing it is
+   installed with `./init.sh --profile aws`, which also installs Terraform in `~/.local/bin`.
+
+For a one-off install, pass AWS credentials for this run only, so the host keeps no access to the token:
+
+```bash
+read -rs AWS_ACCESS_KEY_ID; read -rs AWS_SECRET_ACCESS_KEY; export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+bash runner/setup.sh
+unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+```
 
 The token is only exchanged for registration/removal tokens (valid one hour). It is never written to disk, passed on a
 command line or printed.

@@ -10,11 +10,13 @@
 #
 # GitHub token, first one found: GH_TOKEN / GITHUB_TOKEN, `gh auth token`, or the AWS Secrets Manager secret
 # $RUNNER_SECRET_NAME (default mrjithendar-github-pat, region $AWS_REGION or us-east-1; JSON key github_token or
-# github_pat, or the bare token). It needs Administration: write on the repository. It is only exchanged for
+# github_pat, or the bare token; a missing AWS CLI is installed with init.sh, the host needs AWS credentials). It
+# needs Administration: write on the repository. It is only exchanged for
 # short-lived registration tokens and is never written to disk or shown on a command line.
 set -euo pipefail
 umask 077
 
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 REPO=${RUNNER_REPO:-mrjithendar/tools}
 COUNT=${RUNNER_COUNT:-2}
 BASE=${RUNNER_DIR:-$HOME/actions-runners/tools}
@@ -47,13 +49,23 @@ repo_of() { python3 -c 'import json,sys; print(json.loads(open(sys.argv[1], enco
 
 # --- GitHub tokens ------------------------------------------------------------------------------------
 
+# Runs inside runner_token's command substitution: stdout must stay clean, so installer output goes to stderr.
+ensure_aws_cli() {
+  export PATH="$PATH:$HOME/.local/bin"
+  command -v aws >/dev/null && return
+  say "Installing the AWS CLI to read secret $SECRET" >&2
+  bash "$ROOT/init.sh" --profile aws >&2 || die "could not install the AWS CLI; set GH_TOKEN instead"
+  command -v aws >/dev/null || die "the AWS CLI is not on PATH after init.sh; set GH_TOKEN instead"
+}
+
 GH_ADMIN_TOKEN=""
 github_token() {
   [[ -n $GH_ADMIN_TOKEN ]] && return
   GH_ADMIN_TOKEN=${GH_TOKEN:-${GITHUB_TOKEN:-}}
   if [[ -z $GH_ADMIN_TOKEN ]] && command -v gh >/dev/null; then GH_ADMIN_TOKEN=$(gh auth token --hostname github.com 2>/dev/null || true); fi
   if [[ -z $GH_ADMIN_TOKEN ]]; then
-    command -v aws >/dev/null || die "no GitHub token: set GH_TOKEN, run 'gh auth login', or install the AWS CLI to read secret $SECRET"
+    ensure_aws_cli
+    aws sts get-caller-identity >/dev/null 2>&1 || die "no AWS credentials on this host to read secret $SECRET: run 'aws configure', export AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or set GH_TOKEN"
     GH_ADMIN_TOKEN=$(aws secretsmanager get-secret-value --secret-id "$SECRET" --region "$REGION" --query SecretString --output text 2>/dev/null |
       python3 -c '
 import json, sys
@@ -65,7 +77,7 @@ except ValueError:
 if isinstance(value, dict):
     value = next((value[k] for k in ("github_token", "github_pat", "password") if value.get(k)), "")
 print(value if isinstance(value, str) else "")') || true
-    [[ -n $GH_ADMIN_TOKEN ]] || die "could not read a GitHub token from AWS secret $SECRET in $REGION (check AWS credentials and secretsmanager:GetSecretValue)"
+    [[ -n $GH_ADMIN_TOKEN ]] || die "could not read a GitHub token from AWS secret $SECRET in $REGION (check secretsmanager:GetSecretValue and the secret name)"
   fi
 }
 
