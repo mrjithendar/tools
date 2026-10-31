@@ -233,6 +233,12 @@ variable "eks_cloudwatch_observability_enabled" {
   default     = false
 }
 
+variable "eks_letsencrypt_dns_zone" {
+  description = "Cloudflare DNS zone that the Let's Encrypt ClusterIssuers solve DNS-01 for. Empty installs no issuers."
+  type        = string
+  default     = ""
+}
+
 variable "eks_prometheus_remote_write_url" {
   description = "Prometheus remote write endpoint for cluster metrics. Empty installs no agent."
   type        = string

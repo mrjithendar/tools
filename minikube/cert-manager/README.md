@@ -88,3 +88,16 @@ kubectl -n cert-manager logs deployment/cert-manager --tail=100
 - After resetting Minikube: run this installer again and recreate the site's Certificate/Ingress. Old cluster-local credentials are gone.
 
 Documentation: [cert-manager Helm installation](https://cert-manager.io/docs/installation/helm/), [HTTP-01 solver](https://cert-manager.io/docs/configuration/acme/http01/).
+
+## EKS
+
+`infrastructure/eks-letsencrypt.tf` installs `letsencrypt-staging` and `letsencrypt-prod` on the `roboshop-demo` EKS cluster from this chart. `jithendar.com` points at mk4 and EKS has no ingress controller, so these issuers solve DNS-01 through Cloudflare instead of HTTP-01.
+
+They need a Cloudflare API token limited to **Zone → DNS → Edit** on `jithendar.com`. Create the Secret by hand, so the token stays out of Terraform state:
+
+```bash
+read -rs CF_TOKEN
+kubectl --context roboshop-demo -n cert-manager create secret generic cloudflare-api-token \
+  --from-literal=api-token="$CF_TOKEN"
+unset CF_TOKEN
+```

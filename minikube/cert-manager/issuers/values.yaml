@@ -1,4 +1,7 @@
 email: jithendardharmapuri@gmail.com
+# Set to use DNS-01 through Cloudflare instead of HTTP-01, for a cluster the domain does not point at.
+# EKS sets this in infrastructure/eks-letsencrypt.tf.
+dns01: {}
 # Must match the installed ingress controller's IngressClass.
 ingressClassName: traefik
 issuers:

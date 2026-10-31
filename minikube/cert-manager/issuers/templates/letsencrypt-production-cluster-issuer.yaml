@@ -10,7 +10,18 @@ spec:
     privateKeySecretRef:
       name: {{ .Values.issuers.production.accountSecret | quote }}
     solvers:
+      {{- if .Values.dns01 }}
+      - selector:
+          dnsZones:
+            - {{ .Values.dns01.zone | quote }}
+        dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: {{ .Values.dns01.apiTokenSecret | quote }}
+              key: {{ .Values.dns01.apiTokenKey | quote }}
+      {{- else }}
       - http01:
           ingress:
             ingressClassName: {{ required "Set ingressClassName" .Values.ingressClassName | quote }}
+      {{- end }}
 {{- end }}

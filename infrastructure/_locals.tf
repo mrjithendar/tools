@@ -15,6 +15,7 @@ locals {
   eks_fargate_enabled                  = var.eks_enabled && length(var.eks_fargate_namespaces) > 0
   eks_network_observability_enabled    = var.eks_enabled && var.eks_network_observability_enabled
   eks_cloudwatch_observability_enabled = var.eks_enabled && var.eks_cloudwatch_observability_enabled
+  eks_letsencrypt_enabled              = var.eks_enabled && var.eks_letsencrypt_dns_zone != ""
   eks_prometheus_agent_enabled         = var.eks_enabled && var.eks_prometheus_remote_write_url != ""
   eks_observability_addons = [
     "cert-manager",

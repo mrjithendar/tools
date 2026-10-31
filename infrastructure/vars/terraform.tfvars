@@ -31,3 +31,5 @@ eks_network_flow_monitor_scope_arn = "arn:aws:networkflowmonitor:us-east-1:88102
 eks_prometheus_remote_write_url = "https://jithendar.com/prometheus/api/v1/write"
 
 eks_cloudwatch_observability_enabled = false
+
+eks_letsencrypt_dns_zone = "jithendar.com"

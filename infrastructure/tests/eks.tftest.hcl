@@ -231,3 +231,28 @@ run "cloudwatch_observability_enables_all_three" {
     error_message = "All three features must be on, with the agent's service account."
   }
 }
+
+run "letsencrypt_off_by_default" {
+  command = plan
+  variables {
+    eks_enabled              = true
+    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
+  }
+  assert {
+    condition     = length(helm_release.letsencrypt_issuers) == 0
+    error_message = "The issuers must be opt-in."
+  }
+}
+
+run "letsencrypt_uses_dns01" {
+  command = plan
+  variables {
+    eks_enabled              = true
+    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
+    eks_letsencrypt_dns_zone = "example.com"
+  }
+  assert {
+    condition     = yamldecode(helm_release.letsencrypt_issuers[0].values[0]).dns01.zone == "example.com"
+    error_message = "EKS issuers must solve DNS-01 for the configured zone."
+  }
+}
