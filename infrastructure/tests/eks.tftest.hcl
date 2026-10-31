@@ -28,7 +28,7 @@ run "private_cluster" {
     error_message = "API must default to private-only."
   }
   assert {
-    condition     = aws_eks_node_group.main[0].ami_type == "AL2023_x86_64_STANDARD" && aws_eks_node_group.main[0].scaling_config[0].desired_size == 2
+    condition     = aws_eks_node_group.main[0].ami_type == "AL2023_ARM_64_STANDARD" && aws_eks_node_group.main[0].scaling_config[0].desired_size == 2
     error_message = "Use two AL2023 workers by default."
   }
   assert {

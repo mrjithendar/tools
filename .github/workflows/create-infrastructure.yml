@@ -52,8 +52,8 @@ jobs:
           terraform -chdir=infrastructure init -input=false -no-color
           terraform -chdir=infrastructure validate -no-color
 
-      # - name: terraform test
-      #   run: terraform -chdir=infrastructure test -no-color
+      - name: terraform test
+        run: terraform -chdir=infrastructure test -no-color
 
       - name: terraform plan
         run: |

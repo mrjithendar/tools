@@ -1,4 +1,4 @@
-# Worker nodes for the cluster in eks.tf; opt-in through eks_enabled.
+# Worker nodes for the cluster in eks_cluster.tf; opt-in through eks_enabled.
 variable "eks_node_instance_types" {
   type    = list(string)
   default = ["t4g.medium"]
@@ -29,7 +29,7 @@ resource "aws_eks_node_group" "main" {
   node_role_arn   = aws_iam_role.eks_nodes[0].arn
   subnet_ids      = local.privateSubnets
   version         = var.eks_version
-  ami_type        = "AL2023_x86_64_STANDARD"
+  ami_type        = "AL2023_ARM_64_STANDARD" # CI publishes linux/arm64 images only
   instance_types  = var.eks_node_instance_types
   capacity_type   = "ON_DEMAND"
   disk_size       = 50

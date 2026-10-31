@@ -1,7 +1,7 @@
 > **Scope:** this is the owner's lab-account stack (VPC, the mutable ECR repositories used by the
 > lab CI, SES for jithendar.com, and the Bedrock identity for the self-hosted Moks). EKS now
 > lives in its own reusable root module, `deploy/eks` in roboshop-ai, with separate state and no
-> personal values. `eks.tf` and `eks-node-groups.tf` here are the older opt-in version and create nothing unless
+> personal values. `eks_cluster.tf` and `eks-node-groups.tf` here are the older opt-in version and create nothing unless
 > `eks_enabled = true`. To reuse these
 > ECR repositories from the EKS stack in the same account, set `manage_ecr_repositories = false` there.
 
@@ -85,7 +85,7 @@ GitHub, HashiCorp downloads, AWS APIs and the state bucket.
 
 ## ECR repositories
 
-`ecr.tf` creates one private repository per name in the `list(string)` variable
+`eks_ecr.tf` creates one private repository per name in the `list(string)` variable
 `ecr_repository_names`, using `for_each = toset(var.ecr_repository_names)`.
 The default list in `_variables.tf` covers the custom service images. It matches CI's default `ECR_REPOSITORY_PREFIX=roboshop`; shipping uses
 `roboshop-shipping`, not `roboshop-shipping-service`. Official third-party
