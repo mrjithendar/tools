@@ -48,3 +48,43 @@ output "ecr_repository_arns" {
   description = "Repository ARNs for scoping CI publishing and EKS pulling IAM permissions."
   value       = { for name, repository in aws_ecr_repository.services : name => repository.arn }
 }
+
+output "shopping_agent_bedrock_role_arn" {
+  description = "Role ARN for an AWS SDK assume-role profile; null when disabled."
+  value       = try(aws_iam_role.shopping_agent_bedrock[0].arn, null)
+}
+
+output "eks_admin_role_arn" {
+  value = try(aws_iam_role.eks_admin[0].arn, null)
+}
+
+output "eks_cluster_name" {
+  value = var.eks_enabled ? aws_eks_cluster.main[0].name : null
+}
+
+output "ses_dns_records" {
+  description = "Publish these DNS records (DKIM CNAMEs must be DNS-only, not proxied). MAIL FROM MX priority is included in value."
+  value = var.ses_enabled ? concat(
+    [for token in aws_sesv2_email_identity.store[0].dkim_signing_attributes[0].tokens : {
+      type  = "CNAME"
+      name  = "${token}._domainkey.${var.ses_domain}"
+      value = "${token}.dkim.amazonses.com"
+    }],
+    [
+      { type = "MX", name = "bounce.${var.ses_domain}", value = "10 feedback-smtp.${var.aws_region}.amazonses.com" },
+      { type = "TXT", name = "bounce.${var.ses_domain}", value = "v=spf1 include:amazonses.com ~all" }
+    ]
+  ) : []
+}
+
+output "ses_smtp" {
+  description = "SMTP connection settings. The IAM user name is not the SMTP login; create region-specific SMTP credentials separately."
+  value = var.ses_enabled ? {
+    host         = "email-smtp.${var.aws_region}.amazonaws.com"
+    port         = 587
+    security     = "starttls"
+    from         = "no-reply@${var.ses_domain}"
+    iam_user     = aws_iam_user.ses_smtp[0].name
+    identity_arn = aws_sesv2_email_identity.store[0].arn
+  } : null
+}

@@ -116,3 +116,87 @@ variable "ecr_pull_principals" {
     error_message = "Pull grants must name a managed repository and at least one explicit IAM account, role or user ARN."
   }
 }
+
+variable "bedrock_trusted_principal_arns" {
+  description = "Existing IAM user/role ARNs allowed to assume the shopping-agent role. Empty disables creation. Never use STS session ARNs."
+  type        = set(string)
+  default     = []
+  validation {
+    condition     = alltrue([for arn in var.bedrock_trusted_principal_arns : can(regex("^arn:aws:iam::[0-9]{12}:(user|role)/[A-Za-z0-9+=,.@_/-]+$", arn))])
+    error_message = "Provide exact IAM user or role ARNs, not wildcard, root, or STS session principals."
+  }
+}
+
+variable "bedrock_inference_profile_id" {
+  description = "US inference profile allowed for the shopping agent. Change together with model ID."
+  type        = string
+  default     = "us.amazon.nova-2-lite-v1:0"
+  validation {
+    condition     = can(regex("^us\\.[a-zA-Z0-9.:-]+$", var.bedrock_inference_profile_id))
+    error_message = "Use an exact US inference profile ID."
+  }
+}
+
+variable "bedrock_model_id" {
+  type    = string
+  default = "amazon.nova-2-lite-v1:0"
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9.:-]+$", var.bedrock_model_id))
+    error_message = "Use an exact foundation model ID, without wildcards."
+  }
+}
+
+variable "eks_node_instance_types" {
+  type    = list(string)
+  default = ["t4g.medium"]
+}
+
+variable "eks_node_count" {
+  type    = number
+  default = 2
+  validation {
+    condition     = var.eks_node_count >= 2 && var.eks_node_count <= 6 && floor(var.eks_node_count) == var.eks_node_count
+    error_message = "Choose 2 through 6 worker nodes."
+  }
+}
+
+variable "eks_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "eks_version" {
+  description = "1.36 is in EKS standard support and within cert-manager 1.21's tested range."
+  type        = string
+  default     = "1.36"
+}
+
+variable "eks_admin_principal_arns" {
+  description = "IAM role/user ARNs for cluster administrators; not STS session ARNs."
+  type        = set(string)
+  default     = []
+  validation {
+    condition     = alltrue([for arn in var.eks_admin_principal_arns : can(regex("^arn:aws:iam::[0-9]{12}:(role|user)/[A-Za-z0-9+=,.@_/-]+$", arn))])
+    error_message = "Use IAM role/user ARNs, not STS assumed-role session ARNs."
+  }
+}
+
+variable "eks_public_access_cidrs" {
+  description = "Admin/CI public IPv4 CIDRs; empty means private-only API."
+  type        = list(string)
+  default     = []
+  validation {
+    condition     = alltrue([for c in var.eks_public_access_cidrs : can(cidrnetmask(c)) && !endswith(c, "/0")])
+    error_message = "Use restricted IPv4 CIDRs; world-open API access is not allowed."
+  }
+}
+
+variable "eks_private_access_cidrs" {
+  description = "Connected runner/admin IPv4 CIDRs allowed to the private EKS API on TCP 443. Does not create routing or VPN connectivity."
+  type        = set(string)
+  default     = []
+  validation {
+    condition     = alltrue([for c in var.eks_private_access_cidrs : can(cidrnetmask(c)) && !endswith(c, "/0")])
+    error_message = "Use restricted IPv4 CIDRs for private API access."
+  }
+}

@@ -4,9 +4,12 @@ locals {
     Environment = var.environment
     ManagedBy   = "Terraform"
   }, var.userid != "" ? { Owner = var.userid } : {})
-  name_prefix    = "roboshop"
-  privateSubnets = aws_subnet.vpc_private_subnets[*].id
-  publicSubnets  = aws_subnet.vpc_public_subnets[*].id
-  subnets        = concat(local.privateSubnets, local.publicSubnets)
-  nat_count      = var.single_nat_gateway ? 1 : length(var.availability_zones)
+  name_prefix         = "roboshop"
+  privateSubnets      = aws_subnet.vpc_private_subnets[*].id
+  publicSubnets       = aws_subnet.vpc_public_subnets[*].id
+  subnets             = concat(local.privateSubnets, local.publicSubnets)
+  nat_count           = var.single_nat_gateway ? 1 : length(var.availability_zones)
+  bedrock_enabled     = length(var.bedrock_trusted_principal_arns) > 0
+  bedrock_profile_arn = "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.bedrock.account_id}:inference-profile/${var.bedrock_inference_profile_id}"
+  eks_name            = "roboshop-${var.environment}"
 }

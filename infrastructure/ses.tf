@@ -40,30 +40,3 @@ resource "aws_iam_user_policy" "ses_smtp" {
     }]
   })
 }
-
-output "ses_dns_records" {
-  description = "Publish these DNS records (DKIM CNAMEs must be DNS-only, not proxied). MAIL FROM MX priority is included in value."
-  value = var.ses_enabled ? concat(
-    [for token in aws_sesv2_email_identity.store[0].dkim_signing_attributes[0].tokens : {
-      type  = "CNAME"
-      name  = "${token}._domainkey.${var.ses_domain}"
-      value = "${token}.dkim.amazonses.com"
-    }],
-    [
-      { type = "MX", name = "bounce.${var.ses_domain}", value = "10 feedback-smtp.${var.aws_region}.amazonses.com" },
-      { type = "TXT", name = "bounce.${var.ses_domain}", value = "v=spf1 include:amazonses.com ~all" }
-    ]
-  ) : []
-}
-
-output "ses_smtp" {
-  description = "SMTP connection settings. The IAM user name is not the SMTP login; create region-specific SMTP credentials separately."
-  value = var.ses_enabled ? {
-    host         = "email-smtp.${var.aws_region}.amazonaws.com"
-    port         = 587
-    security     = "starttls"
-    from         = "no-reply@${var.ses_domain}"
-    iam_user     = aws_iam_user.ses_smtp[0].name
-    identity_arn = aws_sesv2_email_identity.store[0].arn
-  } : null
-}
