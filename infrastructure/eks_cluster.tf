@@ -86,6 +86,7 @@ resource "aws_eks_access_entry" "admins" {
   cluster_name  = aws_eks_cluster.main[0].name
   principal_arn = each.value
   type          = "STANDARD"
+  depends_on    = [aws_iam_role.eks_admin] # the principal must exist first
 }
 resource "aws_eks_access_policy_association" "admins" {
   for_each      = aws_eks_access_entry.admins
