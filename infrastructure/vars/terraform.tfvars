@@ -10,3 +10,5 @@ ses_enabled = true
 ses_domain  = "jithendar.com"
 
 ecr_pull_principals = {}
+
+eks_enabled = true
