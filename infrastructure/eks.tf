@@ -3,7 +3,7 @@ locals {
   eks_name = "roboshop-${var.environment}"
 }
 variable "eks_enabled" {
-  type    = bool
+  type = bool
 }
 variable "eks_version" {
   description = "1.36 is in EKS standard support and within cert-manager 1.21's tested range."
