@@ -124,3 +124,23 @@ resource "aws_iam_service_linked_role" "application_signals" {
   count            = local.eks_cloudwatch_observability_enabled ? 1 : 0
   aws_service_name = "application-signals.cloudwatch.amazonaws.com"
 }
+
+# Lets the EBS CSI controller create and attach volumes, through EKS Pod Identity.
+resource "aws_iam_role" "eks_ebs_csi" {
+  count = var.eks_enabled ? 1 : 0
+  name  = "${local.eks_name}-ebs-csi"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = ["sts:AssumeRole", "sts:TagSession"]
+      Principal = { Service = "pods.eks.amazonaws.com" }
+    }]
+  })
+  tags = local.common_tags
+}
+resource "aws_iam_role_policy_attachment" "eks_ebs_csi" {
+  count      = var.eks_enabled ? 1 : 0
+  role       = aws_iam_role.eks_ebs_csi[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEBSCSIDriverPolicyV2"
+}

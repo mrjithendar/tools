@@ -256,3 +256,15 @@ run "letsencrypt_uses_dns01" {
     error_message = "EKS issuers must solve DNS-01 for the configured zone."
   }
 }
+
+run "ebs_csi_driver" {
+  command = plan
+  variables {
+    eks_enabled              = true
+    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
+  }
+  assert {
+    condition     = jsondecode(aws_eks_addon.ebs_csi[0].configuration_values).defaultStorageClass.enabled && one(aws_eks_addon.ebs_csi[0].pod_identity_association).service_account == "ebs-csi-controller-sa"
+    error_message = "The driver must create a default StorageClass and use its controller service account."
+  }
+}
