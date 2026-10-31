@@ -1,4 +1,4 @@
-image: prom/prometheus:v3.15.0
+image: prom/prometheus:v3.15.1
 storage: 5Gi
 # Minikube hostPath-backed storage may not apply fsGroup ownership automatically.
 volumePermissions:
