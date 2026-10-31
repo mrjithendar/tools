@@ -154,3 +154,36 @@ run "observability_addons" {
     error_message = "All observability add-ons must install with the cluster; adot is separate so it can wait for cert-manager."
   }
 }
+
+run "prometheus_agent_off_by_default" {
+  command = plan
+  variables {
+    eks_enabled              = true
+    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
+  }
+  assert {
+    condition     = length(helm_release.prometheus_agent) == 0
+    error_message = "The agent must be opt-in."
+  }
+}
+
+run "prometheus_agent_pushes_remotely" {
+  command = plan
+  variables {
+    eks_enabled                     = true
+    eks_admin_principal_arns        = ["arn:aws:iam::123456789012:role/admin"]
+    eks_prometheus_remote_write_url = "https://example.com/api/v1/write"
+  }
+  assert {
+    condition     = length(helm_release.prometheus_agent) == 1
+    error_message = "A remote write URL must install the agent."
+  }
+}
+
+run "reject_plain_http_remote_write" {
+  command = plan
+  variables {
+    eks_prometheus_remote_write_url = "http://example.com/api/v1/write"
+  }
+  expect_failures = [var.eks_prometheus_remote_write_url]
+}

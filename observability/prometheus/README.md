@@ -137,3 +137,19 @@ sum by (namespace, pod) (
 ```
 
 These queries also work in Grafana Explore with the Prometheus data source. If `up` is zero for a target, open Target health and inspect its last scrape error. If `up` is one but a specific dashboard has no data, check the metric names and label filters it expects.
+
+## Metrics from EKS
+
+The nodes of the `roboshop-demo` EKS cluster are in private subnets, so this Prometheus cannot scrape them. A Prometheus agent there (`infrastructure/eks-prometheus-agent.tf`) scrapes node-exporter and pushes to `https://jithendar.com/prometheus/api/v1/write`. Those series have `cluster="roboshop-demo"` and `job="eks-node-exporter"`.
+
+That one path has its own Traefik login, `prometheus-remote-write-auth`, so EKS never holds the shared `monitoring-auth` password. The login only reaches the write endpoint. Create the same password on both clusters, before syncing this chart and applying the Terraform:
+
+```bash
+PASS=$(openssl rand -hex 32)
+kubectl --context mk4 -n monitoring create secret generic prometheus-remote-write-auth \
+  --type=kubernetes.io/basic-auth --from-literal=username=eks --from-literal=password="$PASS"
+kubectl --context roboshop-demo create namespace monitoring
+kubectl --context roboshop-demo -n monitoring create secret generic prometheus-remote-write-auth \
+  --from-literal=password="$PASS"
+unset PASS
+```

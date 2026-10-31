@@ -66,6 +66,9 @@ spec:
             - --storage.tsdb.retention.size={{ .Values.retentionSize }}
             - --web.external-url=https://jithendar.com/prometheus/
             - --web.route-prefix=/prometheus
+            {{- if .Values.remoteWrite.enabled }}
+            - --web.enable-remote-write-receiver
+            {{- end }}
           ports: [{name: http, containerPort: 9090}]
           securityContext:
             allowPrivilegeEscalation: false

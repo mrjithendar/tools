@@ -216,3 +216,13 @@ variable "eks_network_observability_enabled" {
   type        = bool
   default     = false
 }
+
+variable "eks_prometheus_remote_write_url" {
+  description = "Prometheus remote write endpoint for cluster metrics. Empty installs no agent."
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.eks_prometheus_remote_write_url == "" || startswith(var.eks_prometheus_remote_write_url, "https://")
+    error_message = "Use an https:// URL: the write password is sent with every request."
+  }
+}

@@ -9,6 +9,10 @@ retentionSize: 4GB
 # Discover nodes and collect kubelet/container metrics through the authenticated API proxy.
 kubernetesMetrics:
   enabled: true
+# Accept metrics pushed from clusters this Prometheus cannot reach. The Secret is created by hand: see README.
+remoteWrite:
+  enabled: true
+  secretName: prometheus-remote-write-auth
 # Add Kubernetes-reachable scrape jobs here. Use Kubernetes service DNS names.
 # Only services whose /metrics endpoint answers are listed; files/alerts.yml uses these job names.
 extraScrapeConfigs:
