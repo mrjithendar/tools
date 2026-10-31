@@ -12,4 +12,5 @@ locals {
   bedrock_enabled     = length(var.bedrock_trusted_principal_arns) > 0
   bedrock_profile_arn = "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.bedrock.account_id}:inference-profile/${var.bedrock_inference_profile_id}"
   eks_name            = "roboshop-${var.environment}"
+  eks_fargate_enabled = var.eks_enabled && length(var.eks_fargate_namespaces) > 0
 }

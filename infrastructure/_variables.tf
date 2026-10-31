@@ -200,3 +200,13 @@ variable "eks_private_access_cidrs" {
     error_message = "Use restricted IPv4 CIDRs for private API access."
   }
 }
+
+variable "eks_fargate_namespaces" {
+  description = "Kubernetes namespaces whose Pods run on Fargate. Empty creates no profile. Fargate is x86 only, so these need linux/amd64 images."
+  type        = set(string)
+  default     = []
+  validation {
+    condition     = length(var.eks_fargate_namespaces) <= 5 && alltrue([for ns in var.eks_fargate_namespaces : can(regex("^[a-z0-9*?]([-a-z0-9*?]*[a-z0-9*?])?$", ns))])
+    error_message = "Use up to five namespace names; * and ? wildcards are allowed."
+  }
+}

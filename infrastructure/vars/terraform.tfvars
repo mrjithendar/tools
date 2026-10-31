@@ -19,3 +19,5 @@ eks_admin_principal_arns = [
 ]
 # Without these the API is private-only and unreachable from outside the VPC: home IP, mk4 server.
 eks_public_access_cidrs = ["122.177.247.138/32", "46.224.38.14/32"]
+# Fargate is x86 only: keep arm64 service images out of these namespaces.
+eks_fargate_namespaces = ["fargate"]

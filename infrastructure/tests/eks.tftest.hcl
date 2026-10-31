@@ -68,3 +68,36 @@ run "reject_world_open_private_api" {
   variables { eks_private_access_cidrs = ["0.0.0.0/0"] }
   expect_failures = [var.eks_private_access_cidrs]
 }
+
+run "fargate_off_by_default" {
+  command = plan
+  variables {
+    eks_enabled              = true
+    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
+  }
+  assert {
+    condition     = length(aws_eks_fargate_profile.main) == 0 && length(aws_iam_role.eks_fargate) == 0
+    error_message = "A Fargate profile must be opt-in."
+  }
+}
+
+run "fargate_namespace" {
+  command = plan
+  variables {
+    eks_enabled              = true
+    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
+    eks_fargate_namespaces   = ["fargate"]
+  }
+  assert {
+    condition     = length(aws_eks_fargate_profile.main) == 1 && one(aws_eks_fargate_profile.main[0].selector).namespace == "fargate"
+    error_message = "The profile must select the configured namespace."
+  }
+}
+
+run "reject_six_fargate_namespaces" {
+  command = plan
+  variables {
+    eks_fargate_namespaces = ["a", "b", "c", "d", "e", "f"]
+  }
+  expect_failures = [var.eks_fargate_namespaces]
+}

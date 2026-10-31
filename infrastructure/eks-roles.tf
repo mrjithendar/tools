@@ -55,3 +55,26 @@ resource "aws_iam_role_policy" "eks_admin" {
     }]
   })
 }
+
+# Lets the kubelet on Fargate register with the cluster and pull images from ECR.
+resource "aws_iam_role" "eks_fargate" {
+  count = local.eks_fargate_enabled ? 1 : 0
+  name  = "${local.eks_name}-fargate"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRole"
+      Principal = { Service = "eks-fargate-pods.amazonaws.com" }
+      Condition = {
+        ArnLike = { "aws:SourceArn" = "arn:aws:eks:${var.aws_region}:${data.aws_caller_identity.bedrock.account_id}:fargateprofile/${local.eks_name}/*" }
+      }
+    }]
+  })
+  tags = local.common_tags
+}
+resource "aws_iam_role_policy_attachment" "eks_fargate" {
+  count      = local.eks_fargate_enabled ? 1 : 0
+  role       = aws_iam_role.eks_fargate[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
+}
