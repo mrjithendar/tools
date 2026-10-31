@@ -1,12 +1,12 @@
 # Opt-in keeps existing VPC/ECR/SES deployments unchanged until EKS is configured.
 resource "aws_eks_cluster" "main" {
-  count                     = var.eks_enabled ? 1 : 0
-  name                      = local.eks_name
-  role_arn                  = aws_iam_role.eks_cluster[0].arn
-  version                   = var.eks_version
+  count    = var.eks_enabled ? 1 : 0
+  name     = local.eks_name
+  role_arn = aws_iam_role.eks_cluster[0].arn
+  version  = var.eks_version
   enabled_cluster_log_types = [
     "api", "audit", "authenticator", "controllerManager", "scheduler"
-    ]
+  ]
   access_config {
     authentication_mode                         = "API"
     bootstrap_cluster_creator_admin_permissions = false

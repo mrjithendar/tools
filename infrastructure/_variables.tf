@@ -172,12 +172,12 @@ variable "eks_version" {
 }
 
 variable "eks_admin_principal_arns" {
-  description = "IAM role/user ARNs for cluster administrators; not STS session ARNs."
+  description = "IAM role/user or account root ARNs for cluster administrators; not STS session ARNs."
   type        = set(string)
   default     = []
   validation {
-    condition     = alltrue([for arn in var.eks_admin_principal_arns : can(regex("^arn:aws:iam::[0-9]{12}:(role|user)/[A-Za-z0-9+=,.@_/-]+$", arn))])
-    error_message = "Use IAM role/user ARNs, not STS assumed-role session ARNs."
+    condition     = alltrue([for arn in var.eks_admin_principal_arns : can(regex("^arn:aws:iam::[0-9]{12}:(root|(role|user)/[A-Za-z0-9+=,.@_/-]+)$", arn))])
+    error_message = "Use IAM role/user or account root ARNs, not STS assumed-role session ARNs."
   }
 }
 

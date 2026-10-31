@@ -12,7 +12,10 @@ ses_domain  = "jithendar.com"
 ecr_pull_principals = {}
 
 eks_enabled = true
-# Role created by eks-roles.tf; EKS does not accept the account root.
-eks_admin_principal_arns = ["arn:aws:iam::881026659929:role/roboshop-demo-eks-admin"]
+# The role is created by eks-roles.tf. Root is listed for the EKS console while the account has no IAM users.
+eks_admin_principal_arns = [
+  "arn:aws:iam::881026659929:role/roboshop-demo-eks-admin",
+  "arn:aws:iam::881026659929:root",
+]
 # Without these the API is private-only and unreachable from outside the VPC: home IP, mk4 server.
 eks_public_access_cidrs = ["122.177.247.138/32", "46.224.38.14/32"]
