@@ -42,7 +42,6 @@ Every entry point can run from any directory, and most accept `--help`.
 | `./create-secrets.sh [--apply] [--all]` | Create missing installation credentials. Never rotates existing ones. |
 | `./deploy-argocd.sh [app\|all\|roboshop\|list\|status]` | Register and sync Argo CD Applications. |
 | `./deploy-traefik.sh` | Install or upgrade Traefik on its own (`minikube/deploy-traefik.sh`). |
-| `./kubectl.sh ARGS` | `kubectl` with the downloaded cluster kubeconfig. |
 
 Less common operations in `minikube/`:
 
@@ -60,6 +59,7 @@ Less common operations in `minikube/`:
 | Path | Contents |
 |---|---|
 | `minikube/` | Cluster scripts and per-component config: [argocd](minikube/argocd/README.md), [cert-manager](minikube/cert-manager/README.md), [traefik](minikube/traefik/README.md), [vault](minikube/vault/README.md), [jfrog](minikube/jfrog/README.md), [metrics-server](minikube/metrics-server/README.md), [ecr-refresh](minikube/ecr-refresh/README.md), `namespaces/`, and shared RoboShop ingress/config in [roboshop](minikube/roboshop/README.md). |
+| `infrastructure/` | Terraform for the lab AWS account: VPC, ECR, SES, Bedrock role ([details](infrastructure/README.md)). |
 | `observability/` | Prometheus, Grafana, Loki/Alloy, OpenTelemetry collector, Jaeger. See [observability/README.md](observability/README.md). |
 | `scripts/argocd/` | `bootstrap.py`, `deploy.py`, and `validate.py` (renders the whole catalog and checks ownership). |
 | `scripts/setup/` | Host initialization (`initialize.py`, pinned `versions.json`) and secrets ([SECRETS.md](scripts/setup/SECRETS.md)). |
@@ -73,8 +73,8 @@ client-side commands. x86_64 and ARM64 only.
 
 ### Working with roboshop-ai
 
-The Argo CD catalog (`argocd/`), the microservices, their manifests, Terraform and the
-operations docs live in roboshop-ai. Its Applications read `minikube/*` and
+The shop's Argo CD catalog, the microservices, their manifests and the operations docs live in
+roboshop-ai; `argocd/` here holds the monitoring stack's catalog. Its Applications read `minikube/*` and
 `observability/*` from this repository. The shared jithendar.com certificate, the default
 Traefik TLSStore and `patch-ssl.sh` live in
 [jithendar.com](https://github.com/mrjithendar/jithendar.com). Clone all three side by side,

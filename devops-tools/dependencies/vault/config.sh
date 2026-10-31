@@ -4,11 +4,11 @@ vault operator init -n 1 -t 1 #get the keys to unseal
 vault operator init # 5 unseal keys with 1 root key and we need atleast 3 to unlock/unseal the vault
       (OR)
 vault operator init -key-shares=1 -key-threshold=1 # init the vault and get the unseal key and root key, examples are below
-               Unseal Key 1: uzgQncgFoIYZaLEJz3nbO1mLVvEHMp4WnfmXRWquCdQ=
-               Initial Root Token: hvs.WEKMd68QC9lP7ehxOOKcdsJR
-export VAULT_TOKEN='hvs.WEKMd68QC9lP7ehxOOKcdsJR'
+               Unseal Key 1: <unseal-key>
+               Initial Root Token: <root-token>
+export VAULT_TOKEN='<root-token>'
 vault operator seal/unseal # need to unseal the vault
-vault login hvs.rjCULWN9IZ4430O3M8Tpqvt6
+vault login <root-token>
 
 path "secrets/creds/*" {
  capabilities = ["read"]
@@ -19,8 +19,8 @@ vault policy write jenkins jenkins_policy.hcl
 vault write auth/approle/role/jenkins-role token_num_uses=0 secret_id_num_uses=0 policies=”jenkins”
 vault auth enable approle
 
-vault read auth/approle/role/jenkins-role/role-id # fetch role id ex: role_id:df1cf1b0-e10f-c7ed-197c-da870111fbb3
-vault write -f auth/approle/role/jenkins-role/secret-id # crate secret: secret_id:40c4a179-7dcf-5a8c-a679-7c6fab38ae5e
+vault read auth/approle/role/jenkins-role/role-id # fetch role id ex: role_id:<role-id>
+vault write -f auth/approle/role/jenkins-role/secret-id # crate secret: secret_id:<secret-id>
 
 # Enable Secrets where path = “secrets” and it will using key value pair
 vault secrets enable -path=secrets kv

@@ -37,7 +37,7 @@ rm -f $FILENAME
 mv $FOLDERNAME sonarqube
 
 chown sonar:sonar sonarqube -R
-cp dependencies/sonar.service >/etc/systemd/system/sonarqube.service
+cp /tmp/tools/devops-tools/dependencies/sonar.service /etc/systemd/system/sonarqube.service
 systemctl daemon-reload
 systemctl enable sonarqube
 sed -i -e '/^RUN_AS_USER/ d' -e '/#RUN_AS_USER/ a RUN_AS_USER=sonar' /home/sonar/sonarqube/bin/linux-x86-64/sonar.sh

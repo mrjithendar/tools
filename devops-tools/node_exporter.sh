@@ -33,6 +33,6 @@ tar -xf $FILENAME
 rm -f $FILENAME 
 mv $DIRNAME node_exporter 
 
-cp dependencies/prometheus.service /etc/systemd/system/node_exporter.service
+cp /tmp/tools/devops-tools/dependencies/node_exporter.service /etc/systemd/system/node_exporter.service
 systemctl enable node_exporter
 systemctl start node_exporter

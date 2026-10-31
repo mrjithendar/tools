@@ -22,8 +22,8 @@ unzip -o /tmp/loki.zip -d /tmp
 mkdir -p /opt/loki
 cp /tmp/loki-linux-amd64 /opt/loki/loki
 chmod a+x /opt/loki/loki
-cp /tmp/tools/devops/dependencies/loki/loki.yml /opt/loki/loki.yml
-cp /tmp/tools/devops/dependencies/loki/loki.service /etc/systemd/system/loki.service
+cp /tmp/tools/devops-tools/dependencies/loki/loki.yml /opt/loki/loki.yml
+cp /tmp/tools/devops-tools/dependencies/loki/loki.service /etc/systemd/system/loki.service
 
 systemctl daemon-reload
 systemctl enable loki

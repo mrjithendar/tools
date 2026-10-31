@@ -136,7 +136,7 @@ def test_retired_ingestion_has_no_deployable_or_runtime_references():
     assert not (APP/'services/product-ingestion').exists()
     assert not (ROOT/'minikube/gitops/adoption/product-ingestion').exists()
     assert not (ARGOCD/'product-ingestion.yaml').exists()
-    roots=[APP/'services', APP/'.github/workflows', ROOT/'scripts', ARGOCD, APP/'infrastructure', ROOT/'minikube']
+    roots=[APP/'services', APP/'.github/workflows', ROOT/'scripts', ARGOCD, ROOT/'infrastructure', ROOT/'minikube']
     for directory in roots:
         assert directory.is_dir(),directory
         for path in directory.rglob('*'):

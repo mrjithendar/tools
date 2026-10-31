@@ -22,6 +22,6 @@ unzip sonar-scanner-cli-4.5.0.2216-linux.zip
 rm -rf sonar
 mv sonar-scanner-4.5.0.2216-linux sonar
 ln -s /opt/sonar/bin/sonar-scanner /bin/sonar-scanner
-cp dependencies/sonar-quality-gate.sh >/bin/sonar-quality-gate.sh
+cp /tmp/tools/devops-tools/dependencies/sonar-quality-gates.sh /bin/sonar-quality-gate.sh
 chmod +x /bin/sonar-quality-gate.sh
 echo -e "sonar scanner installed successfully"

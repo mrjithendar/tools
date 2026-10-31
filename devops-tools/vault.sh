@@ -29,8 +29,8 @@ mkdir -p /var/lib/vault/
 
 echo "Copying config files"
 rm -rf /etc/vault.d/vault.hcl
-cp /tmp/tools/devops/dependencies/vault/vault.hcl /var/lib/vault/vault.hcl
-cp /tmp/tools/devops/dependencies/vault/vault.service /etc/systemd/system/vault.service
+cp /tmp/tools/devops-tools/dependencies/vault/vault.hcl /var/lib/vault/vault.hcl
+cp /tmp/tools/devops-tools/dependencies/vault/vault.service /etc/systemd/system/vault.service
 
 echo "Restating Vault Service"
 systemctl daemon-reload

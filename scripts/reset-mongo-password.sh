@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 CTX=mk4; NS=roboshop-ai; NODE=mk4-m03
 kubectl --context $CTX -n $NS get pod -l app=mongodb -o jsonpath='{.items[0].spec.nodeName}{"\n"}'   # must print mk4-m03
 

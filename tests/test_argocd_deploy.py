@@ -75,15 +75,15 @@ def test_stale_live_source_aligned_with_git_before_sync():
 
 
 def test_destination_moves_are_aligned_and_use_git_namespace():
-    git = deploy.catalog()[0]['jaeger']
+    git = deploy.catalog()[0]['prometheus']
     stale = json.loads(json.dumps(git))
     stale['spec']['destination']['namespace'] = 'roboshop-ai'
     responses = ['crd', 'crd', json.dumps({'items': [stale]}), 'appproject/platform',
                  'patched', 'patched', json.dumps({'items': [healthy(git)]})]
-    with patch('sys.argv', ['deploy', 'jaeger']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run, \
+    with patch('sys.argv', ['deploy', 'prometheus']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run, \
             patch.object(deploy.subprocess, 'check_call') as apply:
         deploy.main()
-    assert apply.call_args.args[0][-1].endswith('/minikube/namespaces/observability.yaml')
+    assert apply.call_args.args[0][-1].endswith('/minikube/namespaces/monitoring.yaml')
     ops = json.loads(next(c for c in run.call_args_list if '--type=json' in c.args[0]).kwargs['input'])
     assert ops == [{'op': 'add', 'path': '/spec/destination', 'value': git['spec']['destination']}]
 

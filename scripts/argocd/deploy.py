@@ -13,7 +13,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/lib'))
-from repos import CATALOGS  # noqa: E402
+from repos import ARGOCD, CATALOGS  # noqa: E402
 ARGOCD_CHART_VERSION = '10.10.5'
 # Current shop only. Legacy apps, optional AI apps and existing data services
 # require an explicit name so this shortcut does not restore retired workloads.

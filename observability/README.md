@@ -8,15 +8,13 @@ deploys the Git revision on `master`, so commit and push changes before syncing.
 | Metrics | Prometheus 3.15 | `prometheus` | `monitoring` | [`prometheus/`](prometheus/README.md) (local Helm chart) |
 | Dashboards | Grafana (community chart 14.0.1) | `grafana` | `monitoring` | [`grafana/values.yaml`](grafana/README.md) |
 | Logs | Loki 3.7.9 + Alloy 1.21.2 | `loki` | `monitoring` | [`loki/`](loki/README.md) (Kustomize) |
-| Traces | OpenTelemetry Collector 0.162 → Jaeger 2.22 | `otel-collector`, `jaeger` | `observability` | [`otel-collector/`](otel-collector/) (Kustomize), [`jaeger/`](jaeger/), [design notes](opentelemetry/README.md) |
+| Traces (not deployed: no Argo CD Application) | OpenTelemetry Collector 0.162 → Jaeger 2.22 | none | `observability` | [`otel-collector/`](otel-collector/) (Kustomize), [`jaeger/`](jaeger/), [design notes](opentelemetry/README.md) |
 
 ```bash
-./deploy-argocd.sh prometheus grafana loki otel-collector jaeger --context mk4
+./deploy-argocd.sh prometheus grafana loki --context mk4
 ```
 
-`deploy-argocd.sh` creates missing Applications but never edits existing ones.
-After changing an Application's source path, update the live Application too
-(`kubectl -n argocd apply -f argocd/<name>.yaml`, or patch `spec.source`).
+`deploy-argocd.sh` creates missing Applications and aligns existing ones with Git before syncing.
 
 ## How the pieces connect
 
@@ -69,7 +67,7 @@ to update user ID 1 (the password is passed over stdin, never as an argument).
 
 ```bash
 kubectl --context mk4 -n monitoring get pods,pvc
-kubectl --context mk4 -n argocd get app prometheus grafana loki otel-collector jaeger
+kubectl --context mk4 -n argocd get app prometheus grafana loki
 python3 -m pytest -q tests/test_loki.py tests/test_yaml_layout.py minikube/test-monitoring-credentials.py
 ```
 

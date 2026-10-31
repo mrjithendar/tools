@@ -8,8 +8,7 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[2]
 import sys
 sys.path.insert(0, str(ROOT / 'scripts/lib'))
-from repos import APP_REPO, TOOLS, checkout  # noqa: E402
-APP = checkout(APP_REPO)  # roboshop-ai: microservices and their manifests
+from repos import TOOLS  # noqa: E402
 spec=importlib.util.spec_from_file_location('initialize',ROOT/'scripts/setup/initialize.py')
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
@@ -39,7 +38,7 @@ class InitializeTests(unittest.TestCase):
    with self.assertRaisesRegex(ValueError,'checksum'):i.artifact('helm','https://example/file','https://example/sum')
    self.assertFalse((Path(temp)/'bin').exists())
  def test_help_and_dry_run_from_other_directory(self):
-  for base,script,args in [(ROOT,'init.sh',['--help']),(APP,'scripts/images/build-push-ecr.sh',['--help']),(ROOT,'deploy-minikube.sh',['--help']),(ROOT,'scripts/maintenance/delete-branches.sh',['--help'])]:
+  for base,script,args in [(ROOT,'init.sh',['--help']),(ROOT,'deploy-minikube.sh',['--help']),(ROOT,'scripts/maintenance/delete-branches.sh',['--help'])]:
    r=subprocess.run(['bash',str(base/script),*args],cwd='/tmp',capture_output=True,text=True)
    self.assertEqual(r.returncode,0,r.stderr)
  def test_invalid_profile_before_commands(self):

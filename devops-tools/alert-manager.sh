@@ -31,7 +31,7 @@ tar -xf $FILENAME
 rm -f $FILENAME
 mv $DIRNAME alertmanager
 
-cp dependencies/alertmanager.service >/etc/systemd/system/alertmanager.service
+cp /tmp/tools/devops-tools/dependencies/alertmanager.service /etc/systemd/system/alertmanager.service
 systemctl enable alertmanager
 systemctl start alertmanager
 echo -e "prometheus alertmanager installed successfully"

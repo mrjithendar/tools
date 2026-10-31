@@ -21,9 +21,9 @@ if [ -z "$CERT_NAME" ]; then
   exit 1
 fi
 
-curl -s https://raw.githubusercontent.com/mrjithendar/tools/devops/master/nexus.sh | sudo bash
-curl -s https://raw.githubusercontent.com/mrjithendar/tools/devops/master/letsencrypt.sh | bash
+bash /tmp/tools/devops-tools/nexus.sh
+bash /tmp/tools/devops-tools/letsencrypt.sh
 
-cp dependencies/nexus.conf >/etc/nginx/conf.d/nexus.conf
+cp /tmp/tools/devops-tools/dependencies/nexus.conf /etc/nginx/conf.d/nexus.conf
 sed -i -e "s/DOMAIN_NAME/${CERT_NAME}/" /etc/nginx/conf.d/nexus.conf
 systemctl restart nginx
