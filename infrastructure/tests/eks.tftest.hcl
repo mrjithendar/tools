@@ -187,3 +187,17 @@ run "reject_plain_http_remote_write" {
   }
   expect_failures = [var.eks_prometheus_remote_write_url]
 }
+
+run "network_observability_reuses_existing_scope" {
+  command = plan
+  variables {
+    eks_enabled                        = true
+    eks_admin_principal_arns           = ["arn:aws:iam::123456789012:role/admin"]
+    eks_network_observability_enabled  = true
+    eks_network_flow_monitor_scope_arn = "arn:aws:networkflowmonitor:us-east-1:123456789012:scope/d894fc8f-92ab-4c38-a32a-04fb931bcbf1"
+  }
+  assert {
+    condition     = length(aws_networkflowmonitor_scope.main) == 0 && aws_networkflowmonitor_monitor.main[0].scope_arn == "arn:aws:networkflowmonitor:us-east-1:123456789012:scope/d894fc8f-92ab-4c38-a32a-04fb931bcbf1"
+    error_message = "An existing scope must be reused, not created again."
+  }
+}

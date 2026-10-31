@@ -1,7 +1,8 @@
 # Container Network Observability: the service map and flow table on the cluster's Network tab in the EKS console.
-# The agent is a DaemonSet, so it sees node pods only, not Fargate. The scope covers the whole account in this region.
+# The agent is a DaemonSet, so it sees node pods only, not Fargate. The scope covers the whole account in this region,
+# and AWS allows one per account and region: set eks_network_flow_monitor_scope_arn when it already exists.
 resource "aws_networkflowmonitor_scope" "main" {
-  count = local.eks_network_observability_enabled ? 1 : 0
+  count = local.eks_network_observability_enabled && var.eks_network_flow_monitor_scope_arn == "" ? 1 : 0
   target {
     region = var.aws_region
     target_identifier {
@@ -16,7 +17,7 @@ resource "aws_networkflowmonitor_scope" "main" {
 resource "aws_networkflowmonitor_monitor" "main" {
   count        = local.eks_network_observability_enabled ? 1 : 0
   monitor_name = "${local.eks_name}-monitor"
-  scope_arn    = aws_networkflowmonitor_scope.main[0].scope_arn
+  scope_arn    = var.eks_network_flow_monitor_scope_arn != "" ? var.eks_network_flow_monitor_scope_arn : aws_networkflowmonitor_scope.main[0].scope_arn
   local_resource {
     type       = "AWS::EKS::Cluster"
     identifier = aws_eks_cluster.main[0].arn

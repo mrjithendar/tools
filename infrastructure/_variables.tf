@@ -217,6 +217,16 @@ variable "eks_network_observability_enabled" {
   default     = false
 }
 
+variable "eks_network_flow_monitor_scope_arn" {
+  description = "Existing Network Flow Monitor scope to use. Empty creates one; AWS allows one per account and region."
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.eks_network_flow_monitor_scope_arn == "" || can(regex("^arn:aws:networkflowmonitor:[a-z0-9-]+:[0-9]{12}:scope/[0-9a-f-]+$", var.eks_network_flow_monitor_scope_arn))
+    error_message = "Provide a Network Flow Monitor scope ARN."
+  }
+}
+
 variable "eks_prometheus_remote_write_url" {
   description = "Prometheus remote write endpoint for cluster metrics. Empty installs no agent."
   type        = string

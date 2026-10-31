@@ -23,5 +23,7 @@ eks_public_access_cidrs = ["122.177.247.138/32", "46.224.38.14/32"]
 eks_fargate_namespaces = ["fargate"]
 
 eks_network_observability_enabled = true
+# Created through the EKS console; AWS allows one scope per account and region.
+eks_network_flow_monitor_scope_arn = "arn:aws:networkflowmonitor:us-east-1:881026659929:scope/d894fc8f-92ab-4c38-a32a-04fb931bcbf1"
 
 eks_prometheus_remote_write_url = "https://jithendar.com/prometheus/api/v1/write"

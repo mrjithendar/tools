@@ -9,6 +9,7 @@ resource "helm_release" "prometheus_agent" {
   version          = "29.40.3"
   namespace        = "monitoring"
   create_namespace = true
+  replace          = true # take over a failed install instead of stopping on the name
   values = [yamlencode({
     alertmanager             = { enabled = false }
     kube-state-metrics       = { enabled = false }
