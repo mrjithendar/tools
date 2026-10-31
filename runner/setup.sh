@@ -5,8 +5,8 @@
 #   bash runner/setup.sh status     # show them
 #   bash runner/setup.sh remove     # stop, unregister and delete them
 #
-# Settings (environment): RUNNER_COUNT (2), RUNNER_REPO (mrjithendar/jithendar.com),
-# RUNNER_DIR (~/actions-runners/jithendar-com), RUNNER_NAME (short hostname), RUNNER_LABELS (extra labels).
+# Settings (environment): RUNNER_COUNT (2), RUNNER_REPO (mrjithendar/tools),
+# RUNNER_DIR (~/actions-runners/tools), RUNNER_NAME (short hostname), RUNNER_LABELS (extra labels).
 #
 # GitHub token, first one found: GH_TOKEN / GITHUB_TOKEN, `gh auth token`, or the AWS Secrets Manager secret
 # $RUNNER_SECRET_NAME (default mrjithendar-github-pat, region $AWS_REGION or us-east-1; JSON key github_token or
@@ -15,9 +15,9 @@
 set -euo pipefail
 umask 077
 
-REPO=${RUNNER_REPO:-mrjithendar/jithendar.com}
+REPO=${RUNNER_REPO:-mrjithendar/tools}
 COUNT=${RUNNER_COUNT:-2}
-BASE=${RUNNER_DIR:-$HOME/actions-runners/jithendar-com}
+BASE=${RUNNER_DIR:-$HOME/actions-runners/tools}
 NAME=${RUNNER_NAME:-$(hostname -s)}
 LABELS=${RUNNER_LABELS:-}
 SECRET=${RUNNER_SECRET_NAME:-mrjithendar-github-pat}
