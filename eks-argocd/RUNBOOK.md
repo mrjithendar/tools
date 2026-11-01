@@ -5,7 +5,7 @@ Takes `https://jithendar.com/roboshop` from mk4 to EKS. Background and design: [
 **This has never been run on EKS.** Each step says what to expect; stop and use [Troubleshooting](#troubleshooting) if the
 output differs. Public traffic does not move until step 10. An NLB is billed from step 4.
 
-Never sync with prune. Never run `kubectl apply` for resources in `eks/` by hand; change Git and sync.
+Never sync with prune. Never run `kubectl apply` for resources in `eks-argocd/` by hand; change Git and sync.
 
 ## Set up
 
@@ -72,8 +72,8 @@ git add -A && git commit -m 'EKS ingress and mesh, disabled' && git push
 Then register the Applications. This changes nothing on either cluster, because none of them sync automatically:
 
 ```bash
-kubectl --context $MK4 apply -f argocd/project-mk-platform.yaml
-kubectl --context $MK4 apply -f eks/applications/
+kubectl --context $MK4 apply -f minikube-argocd/project-mk-platform.yaml
+kubectl --context $MK4 apply -f eks-argocd/applications/
 kubectl --context $MK4 apply -k ../roboshop-ai/argocd-eks
 ```
 
@@ -83,7 +83,7 @@ until step 6, which is expected.
 ## 4. Install the controllers and the NLB
 
 Billing for the NLB starts here. In `infrastructure/vars/terraform.tfvars` set `eks_ingress_enabled = true`, which creates the
-controller's IAM role and Pod Identity. Confirm your current address is still in `eks/platform/istio-ingressgateway.yaml`
+controller's IAM role and Pod Identity. Confirm your current address is still in `eks-argocd/platform/istio-ingressgateway.yaml`
 (`curl -s https://checkip.amazonaws.com`), then commit and push. **Create infrastructure** runs on the self-hosted runner.
 
 ```bash
@@ -93,7 +93,7 @@ gh run watch -R mrjithendar/tools $(gh run list -R mrjithendar/tools --workflow 
 Then sync the controllers from the hub, in this order. The issuers need the token from step 2 to become Ready:
 
 ```bash
-kubectl --context $MK4 apply -f eks/applications/
+kubectl --context $MK4 apply -f eks-argocd/applications/
 for a in metrics-server prometheus-agent letsencrypt-issuers aws-load-balancer-controller istio-base istiod istio-ingressgateway; do
   argocd app diff argocd/roboshop-demo-$a
   argocd app sync argocd/roboshop-demo-$a
@@ -338,10 +338,10 @@ and stop being reachable at `jithendar.com` unless they have moved first:
 |---|---|---|
 | Next.js website | `jithendar.com/`, `www.jithendar.com` | The apex record; `www` also needs adding to the Gateway and Certificate |
 | Argo CD | `/argocd` | It is the hub that deploys `roboshop-demo`; the `argocd` CLI logs in through this path |
-| Prometheus, Grafana | `/prometheus`, `/grafana` | `remoteWrite` in `eks/platform/prometheus-agent.yaml` |
+| Prometheus, Grafana | `/prometheus`, `/grafana` | `remoteWrite` in `eks-argocd/platform/prometheus-agent.yaml` |
 | Moks portal | `/moks` paths | Its own Argo application and schema |
 
-Open the NLB. In `eks/platform/istio-ingressgateway.yaml` set:
+Open the NLB. In `eks-argocd/platform/istio-ingressgateway.yaml` set:
 
 ```yaml
 loadBalancerSourceRanges:
@@ -383,8 +383,8 @@ The signing key is created by hand, so it stays out of Git and does not change b
 
 ```bash
 kubectl --context $EKS -n istio-system create secret generic kiali-signing-key --from-literal=key="$(openssl rand -hex 16)"
-kubectl --context $MK4 apply -f eks/applications/project-eks-platform.yaml
-kubectl --context $MK4 apply -f eks/applications/roboshop-demo-kiali.yaml -f eks/applications/roboshop-demo-kiali-prometheus.yaml
+kubectl --context $MK4 apply -f eks-argocd/applications/project-eks-platform.yaml
+kubectl --context $MK4 apply -f eks-argocd/applications/roboshop-demo-kiali.yaml -f eks-argocd/applications/roboshop-demo-kiali-prometheus.yaml
 argocd app sync argocd/roboshop-demo-kiali-prometheus
 argocd app sync argocd/roboshop-demo-kiali
 argocd app sync argocd/roboshop-demo-ingress
@@ -478,7 +478,7 @@ kubectl --context $EKS -n istio-ingress delete telemetry debug-access-logs
 | A store's clients fail with connection resets, timeouts or auth errors after STRICT | A client without a sidecar, a caller missing from the store's policy, or a store that only listens on one address. | `istioctl -n roboshop-ai x describe pod <store pod>`; the store's `istio-proxy` log with `rbac:debug`. Use the fast rollback in step 8 first. |
 | `403 RBAC: access denied`, or resets on ai-gateway | A policy is missing a legitimate caller. | `istioctl -n roboshop-ai proxy-config log deploy/<dest> --level rbac:debug` and read the log. Fix in Git, or use the fast rollback. |
 | Browser certificate error | The gateway serves no or the wrong certificate, or a staging one. | Step 5 `openssl` command. A staging issuer never passes. |
-| Timeout connecting to the NLB | The address is not in `eks/platform/istio-ingressgateway.yaml`, or DNS is wrong. | `dig`, and the security group from step 4. |
+| Timeout connecting to the NLB | The address is not in `eks-argocd/platform/istio-ingressgateway.yaml`, or DNS is wrong. | `dig`, and the security group from step 4. |
 | TLS handshake resets at the gateway | No `Gateway` synced, or the Secret is absent, so Envoy has no 443 filter chain. | `istioctl -n istio-ingress proxy-config listeners deploy/istio-ingressgateway --port 443`, `kubectl -n istio-ingress get secret`. |
 | Certificate stuck `False` | Issuer not ready or a DNS-01 failure. | `kubectl -n istio-ingress get certificaterequest,order,challenge`, `kubectl describe challenge`. `InvalidSolver` means the Cloudflare Secret is missing. A `403` from Cloudflare means the token lacks DNS edit or zone read on this zone. |
 | Issuer `Ready=False`, `secrets not found` | Step 2 not done. | `kubectl -n cert-manager get secret cloudflare-api-token`. |

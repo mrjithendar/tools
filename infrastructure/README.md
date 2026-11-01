@@ -156,9 +156,9 @@ That stack creates its own VPC; nothing here is reused except, optionally, these
 repositories.
 
 This stack holds what lives in AWS. Controllers on the `roboshop-demo` cluster are Argo CD Applications in
-[eks/applications](../eks/applications), not Helm releases here. `eks_ingress_enabled = true` adds only the AWS Load Balancer
-Controller's IAM role and Pod Identity ([`eks-ingress.tf`](eks-ingress.tf), design in [eks/README.md](../eks/README.md)). Follow
-[eks/RUNBOOK.md](../eks/RUNBOOK.md).
+[eks-argocd/applications](../eks-argocd/applications), not Helm releases here. `eks_ingress_enabled = true` adds only the AWS Load Balancer
+Controller's IAM role and Pod Identity ([`eks-ingress.tf`](eks-ingress.tf), design in [eks-argocd/README.md](../eks-argocd/README.md)). Follow
+[eks-argocd/RUNBOOK.md](../eks-argocd/RUNBOOK.md).
 `policies/` holds the upstream controller IAM policy for the pinned version; replace it when the chart moves.
 
 ## Amazon SES transactional email

@@ -1,4 +1,4 @@
-# ClusterIssuers for this cluster's own cert-manager, the EKS add-on; mk4 has a separate one (argocd/cert-manager.yaml).
+# ClusterIssuers for this cluster's own cert-manager, the EKS add-on; mk4 has a separate one (minikube-argocd/cert-manager.yaml).
 # The domain is not served from EKS yet, so they solve DNS-01 through Cloudflare. Token: minikube/cert-manager/README.md.
 apiVersion: argoproj.io/v1alpha1
 kind: Application

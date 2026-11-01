@@ -1,8 +1,8 @@
-# Pushes node metrics to the Prometheus on mk4. Create the Secret first: observability/prometheus/README.md, "Metrics from EKS".
+# Mesh metrics for Kiali. Separate from roboshop-demo-prometheus-agent, which only pushes node metrics to mk4.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: roboshop-demo-prometheus-agent
+  name: roboshop-demo-kiali-prometheus
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: roboshop-gitops
@@ -12,20 +12,19 @@ spec:
   project: eks-platform
   destination:
     name: roboshop-demo
-    namespace: monitoring
+    namespace: istio-system
   syncPolicy:
     syncOptions:
     - FailOnSharedResource=true
     - PruneLast=true
-    - CreateNamespace=true
   sources:
   - repoURL: https://prometheus-community.github.io/helm-charts
     chart: prometheus
     targetRevision: 29.40.3
     helm:
-      releaseName: prometheus-agent
+      releaseName: kiali-prometheus
       valueFiles:
-      - $values/eks/platform/prometheus-agent.yaml
+      - $values/eks-argocd/platform/kiali-prometheus.yaml
   - repoURL: https://github.com/mrjithendar/tools.git
     targetRevision: master
     ref: values

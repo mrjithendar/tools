@@ -6,8 +6,8 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-APPS = ROOT / 'eks/applications'
-PLATFORM = ROOT / 'eks/platform'
+APPS = ROOT / 'eks-argocd/applications'
+PLATFORM = ROOT / 'eks-argocd/platform'
 RELEASES = {
     'aws-load-balancer-controller': 'kube-system',
     'istio-base': 'istio-system',
@@ -73,7 +73,7 @@ def test_kiali_is_read_only_behind_a_login_with_a_stable_key():
 
 
 def test_kiali_route_matches_its_web_root_and_service():
-    route = load(ROOT / 'eks/roboshop-demo/ingress/kiali-virtualservice.yaml')['spec']['http'][0]
+    route = load(ROOT / 'eks-argocd/roboshop-demo/ingress/kiali-virtualservice.yaml')['spec']['http'][0]
     assert route['match'] == [{'uri': {'prefix': load(PLATFORM / 'kiali.yaml')['server']['web_root']}}]
     assert 'rewrite' not in route
 

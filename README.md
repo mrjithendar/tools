@@ -60,7 +60,7 @@ Less common operations in `minikube/`:
 |---|---|
 | `minikube/` | Cluster scripts and per-component config: [argocd](minikube/argocd/README.md), [cert-manager](minikube/cert-manager/README.md), [traefik](minikube/traefik/README.md), [vault](minikube/vault/README.md), [jfrog](minikube/jfrog/README.md), [metrics-server](minikube/metrics-server/README.md), [ecr-refresh](minikube/ecr-refresh/README.md), `namespaces/`, and shared RoboShop ingress/config in [roboshop](minikube/roboshop/README.md). |
 | `infrastructure/` | Terraform for the lab AWS account: VPC, ECR, SES, Bedrock role, the `roboshop-demo` EKS cluster and its add-ons ([details](infrastructure/README.md)). |
-| `eks/` | EKS Applications, RoboShop ingress (AWS Load Balancer Controller, Istio, mTLS) and its [runbook](eks/RUNBOOK.md) ([details](eks/README.md)). |
+| `eks-argocd/` | EKS Applications, RoboShop ingress (AWS Load Balancer Controller, Istio, mTLS) and its [runbook](eks-argocd/RUNBOOK.md) ([details](eks-argocd/README.md)). |
 | `observability/` | Prometheus, Grafana, Loki/Alloy, OpenTelemetry collector, Jaeger. See [observability/README.md](observability/README.md). |
 | `scripts/argocd/` | `bootstrap.py`, `deploy.py`, and `validate.py` (renders the whole catalog and checks ownership). |
 | `scripts/setup/` | Host initialization (`initialize.py`, pinned `versions.json`) and secrets ([SECRETS.md](scripts/setup/SECRETS.md)). |
@@ -75,7 +75,7 @@ client-side commands. x86_64 and ARM64 only.
 ### Working with roboshop-ai
 
 The shop's Argo CD catalog, the microservices, their manifests and the operations docs live in
-roboshop-ai; `argocd/` here holds the monitoring stack's catalog. Its Applications read `minikube/*` and
+roboshop-ai; `minikube-argocd/` here holds the monitoring stack's catalog. Its Applications read `minikube/*` and
 `observability/*` from this repository. The shared jithendar.com certificate, the default
 Traefik TLSStore and `patch-ssl.sh` live in
 [jithendar.com](https://github.com/mrjithendar/jithendar.com). Clone all three side by side,

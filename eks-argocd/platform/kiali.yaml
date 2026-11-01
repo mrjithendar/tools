@@ -16,7 +16,7 @@ external_services:
   tracing:
     enabled: false
 login_token:
-  # A Secret created by hand (eks/RUNBOOK.md, Kiali). Left empty, the chart generates a new key on every Argo CD render.
+  # A Secret created by hand (eks-argocd/RUNBOOK.md, Kiali). Left empty, the chart generates a new key on every Argo CD render.
   signing_key: secret:kiali-signing-key:key
 server:
   web_root: /kiali

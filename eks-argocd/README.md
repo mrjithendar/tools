@@ -7,7 +7,7 @@ mesh mTLS. Argo CD on mk4 manages this cluster as a remote cluster; register it 
 **Status: not tested on EKS.** Everything here has been validated offline only ([what ran](#validation)). Nothing is
 deployed until you follow [RUNBOOK.md](RUNBOOK.md), and the steps there are the first real run.
 
-These Applications live here rather than in `argocd/` because `scripts/argocd/deploy.py` only deploys to the local cluster.
+These Applications live here rather than in `minikube-argocd/` because `scripts/argocd/deploy.py` only deploys to the local cluster.
 Like the mk4 Applications, they do not sync automatically and must never be synced with prune.
 
 ## Layout
@@ -23,7 +23,7 @@ Like the mk4 Applications, they do not sync automatically and must never be sync
 
 Controllers are Argo CD Applications in `applications/`, in project `eks-platform`, with their values in `platform/`. Terraform
 keeps only what lives in AWS: the cluster, add-ons, IAM and Pod Identity. EKS has its own cert-manager, the AWS add-on; mk4 has a
-separate one (`argocd/cert-manager.yaml`).
+separate one (`minikube-argocd/cert-manager.yaml`).
 Each resource has one owner. Minikube is unchanged: its Applications select files with `directory.include` and ignore the
 new `kustomization.yaml` files, and the namespace label and ServiceAccounts exist only on EKS.
 
@@ -244,7 +244,7 @@ python3 -m pytest -q tests/test_eks_ingress.py tests/test_yaml_layout.py
 `envsubst` and a built `services/web/frontend/dist`; otherwise those cases skip.
 
 ```bash
-kubectl kustomize eks/roboshop-demo/ingress > /tmp/ingress.yaml
+kubectl kustomize eks-argocd/roboshop-demo/ingress > /tmp/ingress.yaml
 kubectl kustomize ../roboshop-ai/argocd-eks/apps/mesh > /tmp/mesh.yaml
 kubeconform -strict -kubernetes-version master -schema-location default \
   -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \

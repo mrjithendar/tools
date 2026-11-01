@@ -1,8 +1,8 @@
-# Reconciles the gateway Service into the NLB. Its IAM role and Pod Identity stay in infrastructure/eks-ingress.tf; keep policies/ on this chart tag.
+# Pushes node metrics to the Prometheus on mk4. Create the Secret first: observability/prometheus/README.md, "Metrics from EKS".
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: roboshop-demo-aws-load-balancer-controller
+  name: roboshop-demo-prometheus-agent
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: roboshop-gitops
@@ -12,21 +12,20 @@ spec:
   project: eks-platform
   destination:
     name: roboshop-demo
-    namespace: kube-system
+    namespace: monitoring
   syncPolicy:
     syncOptions:
     - FailOnSharedResource=true
     - PruneLast=true
     - CreateNamespace=true
-    - ServerSideApply=true
   sources:
-  - repoURL: https://aws.github.io/eks-charts
-    chart: aws-load-balancer-controller
-    targetRevision: 3.6.2
+  - repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus
+    targetRevision: 29.40.3
     helm:
-      releaseName: aws-load-balancer-controller
+      releaseName: prometheus-agent
       valueFiles:
-      - $values/eks/platform/aws-load-balancer-controller.yaml
+      - $values/eks-argocd/platform/prometheus-agent.yaml
   - repoURL: https://github.com/mrjithendar/tools.git
     targetRevision: master
     ref: values

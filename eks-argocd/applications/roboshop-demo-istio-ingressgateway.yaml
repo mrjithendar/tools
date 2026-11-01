@@ -25,7 +25,7 @@ spec:
     helm:
       releaseName: istio-ingressgateway
       valueFiles:
-      - $values/eks/platform/istio-ingressgateway.yaml
+      - $values/eks-argocd/platform/istio-ingressgateway.yaml
   - repoURL: https://github.com/mrjithendar/tools.git
     targetRevision: master
     ref: values

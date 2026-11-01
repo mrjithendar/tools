@@ -1,8 +1,8 @@
-# Mesh metrics for Kiali. Separate from roboshop-demo-prometheus-agent, which only pushes node metrics to mk4.
+# Backs kubectl top and the Horizontal Pod Autoscaler.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: roboshop-demo-kiali-prometheus
+  name: roboshop-demo-metrics-server
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: roboshop-gitops
@@ -12,19 +12,20 @@ spec:
   project: eks-platform
   destination:
     name: roboshop-demo
-    namespace: istio-system
+    namespace: kube-system
   syncPolicy:
     syncOptions:
     - FailOnSharedResource=true
     - PruneLast=true
+    - CreateNamespace=true
   sources:
-  - repoURL: https://prometheus-community.github.io/helm-charts
-    chart: prometheus
-    targetRevision: 29.40.3
+  - repoURL: https://kubernetes-sigs.github.io/metrics-server/
+    chart: metrics-server
+    targetRevision: 3.14.0
     helm:
-      releaseName: kiali-prometheus
+      releaseName: metrics-server
       valueFiles:
-      - $values/eks/platform/kiali-prometheus.yaml
+      - $values/eks-argocd/platform/metrics-server.yaml
   - repoURL: https://github.com/mrjithendar/tools.git
     targetRevision: master
     ref: values

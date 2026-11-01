@@ -1,4 +1,4 @@
-# Mesh dashboard at /kiali; the route is in eks/roboshop-demo/ingress. Create the signing key Secret first: eks/RUNBOOK.md, Kiali.
+# Mesh dashboard at /kiali; the route is in eks-argocd/roboshop-demo/ingress. Create the signing key Secret first: eks-argocd/RUNBOOK.md, Kiali.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -24,7 +24,7 @@ spec:
     helm:
       releaseName: kiali
       valueFiles:
-      - $values/eks/platform/kiali.yaml
+      - $values/eks-argocd/platform/kiali.yaml
   - repoURL: https://github.com/mrjithendar/tools.git
     targetRevision: master
     ref: values

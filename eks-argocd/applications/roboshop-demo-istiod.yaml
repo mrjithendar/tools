@@ -37,7 +37,7 @@ spec:
     helm:
       releaseName: istiod
       valueFiles:
-      - $values/eks/platform/istiod.yaml
+      - $values/eks-argocd/platform/istiod.yaml
   - repoURL: https://github.com/mrjithendar/tools.git
     targetRevision: master
     ref: values

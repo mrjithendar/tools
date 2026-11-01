@@ -5,7 +5,7 @@
 # Minor and patch updates are grouped to keep the PR count down; majors arrive one PR each.
 # Security updates are not grouped and are not held back by the cooldown.
 #
-# Not covered, because Dependabot cannot read them; bump these by hand: Helm chart versions in argocd/*.yaml,
+# Not covered, because Dependabot cannot read them; bump these by hand: Helm chart versions in minikube-argocd/*.yaml,
 # scripts/argocd/ and minikube/deploy-*.sh, the host tools in scripts/setup/versions.json, terraform_version
 # in the workflows, and the Vault image (minikube/vault/values.yaml has no Chart.yaml, and
 # tests/test_vault_chart.py pins it).

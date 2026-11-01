@@ -91,7 +91,7 @@ Documentation: [cert-manager Helm installation](https://cert-manager.io/docs/ins
 
 ## EKS
 
-The `roboshop-demo-letsencrypt-issuers` Application (`eks/applications`) installs `letsencrypt-staging` and `letsencrypt-prod` on the `roboshop-demo` EKS cluster from this chart. `jithendar.com` points at mk4 and EKS has no ingress controller, so these issuers solve DNS-01 through Cloudflare instead of HTTP-01.
+The `roboshop-demo-letsencrypt-issuers` Application (`eks-argocd/applications`) installs `letsencrypt-staging` and `letsencrypt-prod` on the `roboshop-demo` EKS cluster from this chart. `jithendar.com` points at mk4 and EKS has no ingress controller, so these issuers solve DNS-01 through Cloudflare instead of HTTP-01.
 
 They need a Cloudflare API token with **Zone → DNS → Edit** and **Zone → Zone → Read** on `jithendar.com`. Create the Secret by hand, so the token stays out of Terraform state:
 
@@ -102,4 +102,4 @@ kubectl --context roboshop-demo -n cert-manager create secret generic cloudflare
 unset CF_TOKEN
 ```
 
-The certificate these issue on EKS is [`eks/roboshop-demo/ingress/jithendar-com-certificate.yaml`](../../eks/roboshop-demo/ingress/jithendar-com-certificate.yaml), for the Istio gateway.
+The certificate these issue on EKS is [`eks-argocd/roboshop-demo/ingress/jithendar-com-certificate.yaml`](../../eks-argocd/roboshop-demo/ingress/jithendar-com-certificate.yaml), for the Istio gateway.

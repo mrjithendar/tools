@@ -18,7 +18,7 @@ def test_catalog_has_unique_safe_ownership():
     assert not {'moks','catalogue-service','web'} & names
     assert not {'shopping-agent','product-ingestion','jfrog'} & names
     assert not {'argocd','traefik','coredns','kube-proxy','kindnet'}&names
-    assert len(apps)==4  # tools/argocd; RoboShop is on EKS (roboshop-ai/argocd-eks)
+    assert len(apps)==4  # tools/minikube-argocd; RoboShop is on EKS (roboshop-ai/argocd-eks)
     assert 'cert-manager' not in names
     assert not any(ns=='roboshop-ai' and kind in ('Deployment','StatefulSet') for _,kind,ns,_ in owners)
 

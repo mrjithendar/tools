@@ -18,7 +18,7 @@ ARGOCD_CHART_VERSION = '10.10.5'
 
 
 def catalog():
-    """Applications and AppProjects from the mk4 catalog (tools/argocd)."""
+    """Applications and AppProjects from the mk4 catalog (tools/minikube-argocd)."""
     docs = []
     for directory in CATALOGS:
         resources = yaml.safe_load((directory / 'kustomization.yaml').read_text())['resources']
@@ -71,7 +71,7 @@ def main():
     if 'cert-manager' in args.apps:
         apps['cert-manager'] = yaml.safe_load((MONITORING_ARGOCD / 'cert-manager.yaml').read_text())
     if args.apps == ['list']:
-        print('all: every Application registered in tools/argocd')
+        print('all: every Application registered in tools/minikube-argocd')
         print('Available apps: ' + ' '.join(sorted(apps)))
         return
     if args.timeout <= 0:

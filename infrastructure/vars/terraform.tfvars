@@ -30,5 +30,5 @@ eks_network_flow_monitor_scope_arn = "arn:aws:networkflowmonitor:us-east-1:88102
 
 eks_cloudwatch_observability_enabled = false
 
-# IAM for the load balancer controller. Controllers and allowed addresses: eks/applications, eks/platform.
+# IAM for the load balancer controller. Controllers and allowed addresses: eks-argocd/applications, eks-argocd/platform.
 eks_ingress_enabled = true
