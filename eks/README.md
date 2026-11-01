@@ -14,14 +14,17 @@ Like the mk4 Applications, they do not sync automatically and must never be sync
 
 | Path | Contents | Applied by |
 |---|---|---|
-| `../infrastructure/eks-ingress.tf`, `eks-roles.tf` | AWS Load Balancer Controller, its IAM role and Pod Identity, Istio base, istiod, ingress gateway and the NLB Service | Terraform, once `eks_ingress_enabled = true` |
+| `../infrastructure/eks-ingress.tf`, `eks-roles.tf` | The AWS Load Balancer Controller's IAM role and Pod Identity | Terraform, on push to master |
+| `applications/roboshop-demo-*.yaml`, `platform/` | AWS Load Balancer Controller, Istio base, istiod, gateway and NLB Service, metrics-server, Prometheus agent, Let's Encrypt issuers, with their values | Argo CD, project `eks-platform` |
 | `roboshop-demo/ingress/` | Certificate, Gateway, VirtualService | Argo CD: `roboshop-demo-ingress` |
 | `roboshop-demo/mesh/` | ServiceAccounts, PeerAuthentication, AuthorizationPolicies | Argo CD: `roboshop-demo-mesh` |
 | `edge/` | On **mk4**: the Traefik route that sends `/roboshop` to the NLB | Argo CD: `roboshop-demo-edge`; syncing it is the cutover |
 | `roboshop-ai-catalog.patch` | The change to `roboshop-ai/argocd-eks`, which owns the workloads | `git apply` in roboshop-ai ([why](#the-roboshop-ai-patch)) |
 | `diagrams/roboshop-ingress.mmd` | Editable source of the diagram below | |
 
-Controllers are Terraform `helm_release`s like the other EKS add-ons here, so Argo CD never manages what it depends on.
+Controllers are Argo CD Applications in `applications/`, in project `eks-platform`, with their values in `platform/`. Terraform
+keeps only what lives in AWS: the cluster, add-ons, IAM and Pod Identity. EKS has its own cert-manager, the AWS add-on; mk4 has a
+separate one (`argocd/cert-manager.yaml`).
 Each resource has one owner. Minikube is unchanged: its Applications select files with `directory.include` and ignore the
 new `kustomization.yaml` files, and the namespace label and ServiceAccounts exist only on EKS.
 
@@ -34,11 +37,11 @@ NLB would take the whole website with it.
 
 This repository controls Traefik, so the path routing stays there and only `/roboshop` moves. That differs from the
 default `Browser → NLB` in one way: **the browser's TLS session ends at Traefik on mk4**, and Traefik opens a second,
-verified TLS session to the Istio gateway through the NLB. Only the two addresses in `eks_ingress_source_cidrs` can reach
+verified TLS session to the Istio gateway through the NLB. Only the two addresses in `platform/istio-ingressgateway.yaml` can reach
 the NLB.
 
-This path is temporary, because mk4 will be deleted. The NLB already listens on 443 and 80, and `eks_ingress_source_cidrs`
-accepts `0.0.0.0/0`. Everything else that lives on mk4 has to move first: see [Retiring mk4](RUNBOOK.md#retiring-mk4).
+This path is temporary, because mk4 will be deleted. The NLB already listens on 443 and 80, and its allowlist in
+`platform/istio-ingressgateway.yaml` accepts `0.0.0.0/0`. Everything else that lives on mk4 has to move first: see [Retiring mk4](RUNBOOK.md#retiring-mk4).
 
 The only external change is one DNS record for a **hostname**: `roboshop-origin.jithendar.com`, a DNS-only CNAME to the NLB.
 It keeps the generated load balancer name out of Git. The apex and `www` records are not touched.
@@ -155,7 +158,7 @@ which is a change to the web image.
 
 Neither replaces the other, and neither replaces user login.
 
-**Certificate.** `letsencrypt-prod` already exists on EKS from `infrastructure/eks-letsencrypt.tf`. It uses DNS-01 through
+**Certificate.** `letsencrypt-prod` already exists on EKS from the `roboshop-demo-letsencrypt-issuers` Application. It uses DNS-01 through
 Cloudflare because Let's Encrypt cannot reach this cluster over HTTP. cert-manager writes `jithendar-com-tls` into
 `istio-ingress`, where `credentialName` looks it up, and renews 30 days before expiry; the gateway reloads it without a
 restart, and Traefik simply verifies the new one. The Cloudflare token is the only credential, and it is created by hand in
@@ -210,7 +213,7 @@ Fixing it takes a change to the web image. Nothing in the services treats loopba
 
 Istio identity comes from the pod's ServiceAccount, and enrollment needs a namespace label, but `roboshop-ai/argocd-eks` owns
 those Deployments and the Namespace. This work was scoped to tools, so that repository is untouched and the change ships
-as `roboshop-ai-catalog.patch`, against commit `391b441`. It follows the repository's pattern: a `kustomization.yaml` used only
+as `roboshop-ai-catalog.patch`, against the EKS-only layout of `services/` and `argocd-eks/`. It follows the repository's pattern: a `kustomization.yaml` used only
 by argocd-eks, plus inline patches in each Application. It:
 
 - sets `serviceAccountName` on the 10 application Deployments;
@@ -228,12 +231,12 @@ Checked 2026-10-31 against the Istio support table, the Helm repositories and Gi
 | Component | Pinned | Where | Compatibility |
 |---|---|---|---|
 | Amazon EKS | 1.36 | `eks_version` | Running version |
-| AWS Load Balancer Controller | 3.6.2 (chart 3.6.2) | `eks-ingress.tf` | Latest release. IAM policy is the unmodified upstream `docs/install/iam_policy.json` of that tag, sha256 `16f232c9...a6a`. It covers ALB features this does not use; they are off with `enableShield/Waf/Wafv2=false`. |
-| Istio base, istiod, gateway | 1.30.7 | `eks-ingress.tf` `istio_version` | Supports Kubernetes 1.32-1.36. **End of life ~December 2026.** 1.31.3 is released and supports 1.32-1.37, but its charts are in neither the Helm repository nor the OCI registry yet. Move when they are. |
+| AWS Load Balancer Controller | 3.6.2 (chart 3.6.2) | `applications/roboshop-demo-aws-load-balancer-controller.yaml` | Latest release. IAM policy is the unmodified upstream `docs/install/iam_policy.json` of that tag, sha256 `16f232c9...a6a`. It covers ALB features this does not use; they are off with `enableShield/Waf/Wafv2=false`. |
+| Istio base, istiod, gateway | 1.30.7 | `applications/roboshop-demo-istio-*.yaml` | Supports Kubernetes 1.32-1.36. **End of life ~December 2026.** 1.31.3 is released and supports 1.32-1.37, but its charts are in neither the Helm repository nor the OCI registry yet. Move when they are. |
 | cert-manager | EKS add-on, AWS default for 1.36 | `eks-addons.tf` | Existing |
 | Traefik | chart 42.0.0, v3.7.14 | `minikube/deploy-traefik.sh` | `ServersTransport` and `IngressRoute` CRDs confirmed on mk4 |
 | Argo CD | v3.5.5 | mk4 | `Application` kustomize patches already in use |
-| Terraform | 1.16.6 | workflows | Helm provider ~> 3.0, AWS provider ~> 6.0 |
+| Terraform | 1.16.6 | workflows | AWS provider ~> 6.0 |
 
 Istio CNI is not used: pods get a short-lived `istio-init` with `NET_ADMIN`, which avoids a privileged DaemonSet on a two-node
 cluster. Gateway API CRDs are not installed; this uses Istio's own Gateway and VirtualService, as `deploy/eks` does.

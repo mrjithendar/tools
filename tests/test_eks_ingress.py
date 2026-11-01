@@ -1,13 +1,11 @@
 """EKS ingress and mesh: routing, the /roboshop prefix boundary, identities and the argocd-eks patch."""
 import http.server
-import io
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
-import tarfile
 import threading
 import urllib.error
 import urllib.request
@@ -179,11 +177,11 @@ def test_edge_application_targets_mk4_and_never_syncs_itself():
 def catalog(tmp_path_factory):
     """roboshop-ai's EKS Applications with the patch from this repository applied, as a temporary copy."""
     root = tmp_path_factory.mktemp('roboshop-ai')
-    archive = subprocess.check_output(['git', '-C', str(APP), 'archive', 'HEAD', 'services', 'argocd-eks'])
-    tarfile.open(fileobj=io.BytesIO(archive)).extractall(root, filter='data')
+    for name in ('services', 'argocd-eks'):
+        shutil.copytree(APP / name, root / name, ignore=shutil.ignore_patterns('node_modules', '.venv', '__pycache__'))
     if 'serviceAccountName' not in (root / 'argocd-eks/web.yaml').read_text():
         subprocess.check_call(['git', 'apply', '--unsafe-paths', f'--directory={root}', str(EKS / 'roboshop-ai-catalog.patch')], cwd=root)
-    shutil.copytree(ROOT / 'minikube/roboshop', root / 'minikube/roboshop')
+    shutil.copytree(ROOT / 'eks/roboshop', root / 'eks/roboshop')
     return root
 
 
@@ -213,8 +211,8 @@ def test_route_destination_is_the_real_web_service(catalog):
 
 
 def test_gateway_identity_and_selector_match_the_helm_release():
-    source = (ROOT / 'infrastructure/eks-ingress.tf').read_text()
-    assert re.search(r'name\s+= "istio-ingressgateway"', source)  # chart: ServiceAccount, and label istio=ingressgateway
+    app = load(EKS / 'applications/roboshop-demo-istio-ingressgateway.yaml')
+    assert app['spec']['sources'][0]['helm']['releaseName'] == 'istio-ingressgateway'  # chart: ServiceAccount, and label istio=ingressgateway
     assert load(INGRESS / 'public-gateway.yaml')['spec']['selector'] == {'istio': 'ingressgateway'}
 
 
@@ -249,8 +247,8 @@ def test_catalog_enrolls_the_namespace_without_losing_its_prune_protection(catal
     assert namespace['metadata']['annotations']['argocd.argoproj.io/sync-options'] == 'Prune=false,Delete=false'
 
 
-def test_mk4_namespace_stays_unlabelled():
-    assert 'labels' not in load(ROOT / 'minikube/roboshop/roboshop-ai-namespace.yaml')['metadata']
+def test_base_namespace_leaves_the_label_to_the_patch():
+    assert 'labels' not in load(ROOT / 'eks/roboshop/roboshop-ai-namespace.yaml')['metadata']
 
 
 class Echo(http.server.BaseHTTPRequestHandler):

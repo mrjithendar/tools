@@ -1,4 +1,4 @@
-# Certificate, Gateway and VirtualService on EKS. The namespace comes from infrastructure/eks-ingress.tf.
+# Certificate, Gateway and VirtualService on EKS. The namespace comes from roboshop-demo-istio-ingressgateway.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

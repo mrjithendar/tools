@@ -50,7 +50,7 @@ data:
   OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"
   OTEL_SERVICE_NAMESPACE: "roboshop-ai"
   OTEL_SERVICE_VERSION: "0.2.0"
-  DEPLOYMENT_ENVIRONMENT: "minikube"
+  DEPLOYMENT_ENVIRONMENT: "eks"
   OTEL_SDK_DISABLED: "false"
   LANGFUSE_CAPTURE_CONTENT: "false"
 

@@ -233,34 +233,8 @@ variable "eks_cloudwatch_observability_enabled" {
   default     = false
 }
 
-variable "eks_letsencrypt_dns_zone" {
-  description = "Cloudflare DNS zone that the Let's Encrypt ClusterIssuers solve DNS-01 for. Empty installs no issuers."
-  type        = string
-  default     = ""
-}
-
-variable "eks_prometheus_remote_write_url" {
-  description = "Prometheus remote write endpoint for cluster metrics. Empty installs no agent."
-  type        = string
-  default     = ""
-  validation {
-    condition     = var.eks_prometheus_remote_write_url == "" || startswith(var.eks_prometheus_remote_write_url, "https://")
-    error_message = "Use an https:// URL: the write password is sent with every request."
-  }
-}
-
 variable "eks_ingress_enabled" {
-  description = "Install the AWS Load Balancer Controller and Istio, which creates a billed internet-facing NLB. Follow eks/RUNBOOK.md."
+  description = "Create the IAM role and Pod Identity of the AWS Load Balancer Controller, which Argo CD installs. Follow eks/RUNBOOK.md."
   type        = bool
   default     = false
-}
-
-variable "eks_ingress_source_cidrs" {
-  description = "IPv4 CIDRs allowed to reach the NLB on 443 and 80. Required with eks_ingress_enabled; 0.0.0.0/0 serves the Internet directly (eks/RUNBOOK.md, Retiring mk4)."
-  type        = list(string)
-  default     = []
-  validation {
-    condition     = alltrue([for c in var.eks_ingress_source_cidrs : can(cidrnetmask(c))])
-    error_message = "Use IPv4 CIDRs."
-  }
 }

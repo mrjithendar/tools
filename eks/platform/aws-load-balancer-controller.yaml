@@ -1,0 +1,31 @@
+clusterName: roboshop-demo
+region: us-east-1
+vpcId: vpc-03a3ca5123e1e7f3c # terraform output vpc_id; no IMDS lookup from the pod
+replicaCount: 2
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    memory: 256Mi
+podDisruptionBudget:
+  maxUnavailable: 1
+# Webhook certificate from the cert-manager add-on. The chart's own generates a new one on every Argo CD render.
+enableCertManager: true
+# Only a Service that asks for loadBalancerClass service.k8s.aws/nlb gets a load balancer.
+enableServiceMutatorWebhook: false
+createIngressClassResource: false
+# ALB-only features; off so the controller never calls these APIs.
+enableShield: false
+enableWaf: false
+enableWafv2: false
+# Injects the target health readiness gate into the gateway pods: a rollout then waits for the new pod to pass NLB
+# health checks. Selected by name, so the namespace needs no label.
+webhookNamespaceSelectors:
+- key: kubernetes.io/metadata.name
+  operator: In
+  values:
+  - istio-ingress

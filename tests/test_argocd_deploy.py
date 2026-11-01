@@ -16,19 +16,19 @@ def no_external_writes():
         yield
 
 
-def test_roboshop_preview_never_touches_cluster(capsys):
-    with patch('sys.argv', ['deploy', 'roboshop', '--dry-run']), patch.object(deploy.subprocess, 'check_output') as run:
+def test_preview_never_touches_cluster(capsys):
+    with patch('sys.argv', ['deploy', 'grafana', '--dry-run']), patch.object(deploy.subprocess, 'check_output') as run:
         deploy.main()
     run.assert_not_called()
     output = capsys.readouterr().out
-    assert 'web' in output
+    assert 'grafana' in output
     assert 'product-ingestion' not in output
     assert 'shopping-agent' not in output
     assert 'mongodb' not in output
 
 
 def test_unknown_app_fails_before_cluster_access():
-    with patch('sys.argv', ['deploy', 'web', 'typo']), patch.object(deploy.subprocess, 'check_output') as run:
+    with patch('sys.argv', ['deploy', 'loki', 'typo']), patch.object(deploy.subprocess, 'check_output') as run:
         with pytest.raises(SystemExit):
             deploy.main()
     run.assert_not_called()
@@ -42,10 +42,10 @@ def healthy(app):
 
 def test_existing_settings_preserved_and_no_pruning():
     # Matches Git except a live-only setting, which must survive untouched.
-    app = deploy.catalog()[0]['web']
+    app = deploy.catalog()[0]['loki']
     app['spec']['syncPolicy']['syncOptions'] = app['spec']['syncPolicy']['syncOptions'] + ['RespectIgnoreDifferences=true']
     listing = json.dumps({'items': [healthy(app)]})
-    with patch('sys.argv', ['deploy', 'web']), patch.object(deploy.subprocess, 'check_output',
+    with patch('sys.argv', ['deploy', 'loki']), patch.object(deploy.subprocess, 'check_output',
             side_effect=['crd/applications', 'crd/appprojects', listing, 'appproject/platform', 'patched\n', listing]) as run:
         deploy.main()
     commands = [call.args[0] for call in run.call_args_list]
@@ -58,13 +58,13 @@ def test_existing_settings_preserved_and_no_pruning():
 
 def test_stale_live_source_aligned_with_git_before_sync():
     # A pre-split include renders nothing; a prune sync would delete everything.
-    git = deploy.catalog()[0]['ai-gateway']
+    git = deploy.catalog()[0]['loki']
     stale = json.loads(json.dumps(git))
-    stale['spec']['source']['directory']['include'] = 'ai-gateway-minikube.yaml'
+    stale['spec']['source']['path'] = 'observability/retired'
     stale['spec']['sources'] = [{'repoURL': 'https://example.invalid'}]
     responses = ['crd', 'crd', json.dumps({'items': [stale]}), 'appproject/platform',
                  'patched', 'patched', json.dumps({'items': [healthy(git)]})]
-    with patch('sys.argv', ['deploy', 'ai-gateway']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run:
+    with patch('sys.argv', ['deploy', 'loki']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run:
         deploy.main()
     patches = [c for c in run.call_args_list if 'patch' in c.args[0]]
     assert '--type=json' in patches[0].args[0]
@@ -90,13 +90,13 @@ def test_destination_moves_are_aligned_and_use_git_namespace():
 
 def test_missing_git_sync_options_added_and_live_extras_kept():
     # Large ConfigMaps need ServerSideApply; a stale live policy must not drop it.
-    git = deploy.catalog()[0]['postgres']
+    git = deploy.yaml.safe_load((deploy.MONITORING_ARGOCD / 'cert-manager.yaml').read_text())
     stale = json.loads(json.dumps(git))
     stale['spec']['syncPolicy'] = {'syncOptions': ['FailOnSharedResource=true', 'RespectIgnoreDifferences=true'],
                                    'retry': {'limit': 2}}
     responses = ['crd', 'crd', json.dumps({'items': [stale]}), 'appproject/platform',
                  'patched', 'patched', json.dumps({'items': [healthy(git)]})]
-    with patch('sys.argv', ['deploy', 'postgres']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run:
+    with patch('sys.argv', ['deploy', 'cert-manager']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run:
         deploy.main()
     patches = [c for c in run.call_args_list if 'patch' in c.args[0]]
     policy = json.loads(patches[0].kwargs['input'])[-1]
@@ -108,27 +108,27 @@ def test_missing_git_sync_options_added_and_live_extras_kept():
 
 
 def test_synced_app_tracking_no_resources_fails():
-    app = deploy.catalog()[0]['web']
+    app = deploy.catalog()[0]['loki']
     empty = healthy(app); empty['status']['resources'] = []
     listing = json.dumps({'items': [empty]})
-    with patch('sys.argv', ['deploy', 'web']), patch.object(deploy.subprocess, 'check_output',
+    with patch('sys.argv', ['deploy', 'loki']), patch.object(deploy.subprocess, 'check_output',
             side_effect=['crd', 'crd', listing, 'appproject/platform', 'patched', listing]):
         with pytest.raises(RuntimeError, match='tracks no resources'):
             deploy.main()
 
 
 def test_status_warns_about_drift_and_empty_apps(capsys):
-    git = deploy.catalog()[0]['ai-gateway']
+    git = deploy.catalog()[0]['loki']
     stale = json.loads(json.dumps(git))
-    stale['spec']['source']['directory']['include'] = 'ai-gateway-minikube.yaml'
-    good = healthy(deploy.catalog()[0]['web'])
+    stale['spec']['source']['path'] = 'observability/retired'
+    good = healthy(deploy.catalog()[0]['grafana'])
     with patch('sys.argv', ['deploy', 'status']), patch.object(deploy.subprocess, 'check_output',
             side_effect=['crd', 'crd', 'NAME SYNC\n', json.dumps({'items': [stale, good]})]) as run:
         deploy.main()
     out = capsys.readouterr().out
-    assert 'ai-gateway: live source/destination differs from Git' in out
-    assert 'ai-gateway: tracks no resources' in out
-    assert 'web' not in out.replace('NAME SYNC', '')
+    assert 'loki: live source/destination differs from Git' in out
+    assert 'loki: tracks no resources' in out
+    assert 'grafana' not in out.replace('NAME SYNC', '')
     assert not any('patch' in c.args[0] for c in run.call_args_list)
 
 
@@ -140,7 +140,7 @@ def test_default_and_all_include_entire_catalog(arguments, capsys):
     output = capsys.readouterr().out
     apps, _ = deploy.catalog()
     assert 'action: ' + ' '.join(sorted(apps)) in output
-    for name in ('mongodb', 'moks', 'catalogue-service'):
+    for name in ('grafana', 'loki', 'prometheus'):
         assert name in output
 
     for name in ( 'jfrog', 'product-ingestion', 'shopping-agent'):
@@ -204,14 +204,14 @@ def test_helm_list_version_compatibility_and_pending_release(help_text, uses_all
 
 
 def test_missing_controller_installed_before_application_sync():
-    healthy = {'metadata': {'name': 'web'}, 'spec': {'project': 'platform'},
+    healthy = {'metadata': {'name': 'loki'}, 'spec': {'project': 'platform'},
                'status': {'operationState': {'phase': 'Succeeded'},
                           'sync': {'status': 'Synced'}, 'health': {'status': 'Healthy'},
-                          'resources': [{'kind': 'Deployment', 'name': 'web'}]}}
+                          'resources': [{'kind': 'Deployment', 'name': 'loki'}]}}
     responses = ['', '--all-namespaces', '[]', '', 'established', 'established',
                  '{"items":[]}', 'appproject/platform', 'created', 'patched',
                  json.dumps({'items': [healthy]})]
-    with patch('sys.argv', ['deploy', 'web', '--context', 'fresh']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as read, patch.object(deploy.subprocess, 'check_call') as install:
+    with patch('sys.argv', ['deploy', 'loki', '--context', 'fresh']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as read, patch.object(deploy.subprocess, 'check_call') as install:
         deploy.main()
     assert len([c for c in install.call_args_list if c.args[0][0] == 'helm']) == 1
     assert all('fresh' in c.args[0] for c in install.call_args_list)
@@ -219,7 +219,7 @@ def test_missing_controller_installed_before_application_sync():
 
 
 def test_failed_automatic_install_never_deploys_apps():
-    with patch('sys.argv', ['deploy', 'web']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=['', '', '[]', '']) as read, patch.object(deploy.subprocess, 'check_call', side_effect=deploy.subprocess.CalledProcessError(1, 'helm')):
+    with patch('sys.argv', ['deploy', 'loki']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=['', '', '[]', '']) as read, patch.object(deploy.subprocess, 'check_call', side_effect=deploy.subprocess.CalledProcessError(1, 'helm')):
         with pytest.raises(deploy.subprocess.CalledProcessError):
             deploy.main()
     assert not any('patch' in call.args[0] or 'create' in call.args[0] for call in read.call_args_list)
@@ -227,13 +227,13 @@ def test_failed_automatic_install_never_deploys_apps():
 
 @pytest.mark.parametrize('existing', [False, True])
 def test_cert_manager_sync_carries_namespace_and_ssa_options(existing):
-    app = deploy.yaml.safe_load((deploy.ARGOCD / 'cert-manager.yaml').read_text())
+    app = deploy.yaml.safe_load((deploy.MONITORING_ARGOCD / 'cert-manager.yaml').read_text())
     options = app['spec']['syncPolicy']['syncOptions']
     if existing:
         options.append('RespectIgnoreDifferences=true')
     app['status'] = {'operationState': {'phase': 'Succeeded'},
                      'sync': {'status': 'Synced'}, 'health': {'status': 'Healthy'},
-                     'resources': [{'kind': 'Deployment', 'name': 'web'}]}
+                     'resources': [{'kind': 'Deployment', 'name': 'loki'}]}
     responses = ['crd/applications', 'crd/appprojects', json.dumps({'items': [app] if existing else []}), 'appproject/platform']
     if not existing:
         responses.append('created')
@@ -265,19 +265,19 @@ def test_unhealthy_pending_install_stops_without_release_mutation():
 
 
 def test_namespace_applied_before_sync_and_deduplicated():
-    app = deploy.catalog()[0]['web']
+    app = deploy.catalog()[0]['loki']
     app['status'] = {'operationState': {'phase': 'Succeeded'}, 'sync': {'status': 'Synced'}, 'health': {'status': 'Healthy'},
-                     'resources': [{'kind': 'Deployment', 'name': 'web'}]}
+                     'resources': [{'kind': 'Deployment', 'name': 'loki'}]}
     events = []
     responses = iter(['crd', 'crd', json.dumps({'items':[app]}), 'project', 'patched', json.dumps({'items':[app]})])
     def read(command, **kwargs):
         events.append(command)
         return next(responses)
-    with patch('sys.argv', ['deploy', 'web', 'web']), patch.object(deploy.subprocess, 'check_output', side_effect=read), patch.object(deploy.subprocess, 'check_call', side_effect=lambda c: events.append(c)):
+    with patch('sys.argv', ['deploy', 'loki', 'loki']), patch.object(deploy.subprocess, 'check_output', side_effect=read), patch.object(deploy.subprocess, 'check_call', side_effect=lambda c: events.append(c)):
         deploy.main()
     applies = [c for c in events if 'apply' in c]
     assert len(applies) == 1
-    assert applies[0][-1].endswith('/minikube/namespaces/roboshop-ai.yaml')
+    assert applies[0][-1].endswith('/minikube/namespaces/monitoring.yaml')
     assert '--server-side' in applies[0]
     assert events.index(applies[0]) < next(i for i,c in enumerate(events) if 'patch' in c)
 

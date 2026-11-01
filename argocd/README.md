@@ -8,7 +8,7 @@ Applications for the shared monitoring stack, whose sources live in this reposit
 | `prometheus` | `platform` | `observability/prometheus` (local chart) | `monitoring` |
 | `loki` (Loki + Alloy) | `logging` (defined here) | `observability/loki` | `monitoring` |
 
-The `platform` AppProject and every RoboShop application stay in `roboshop-ai/argocd`. `scripts/argocd/deploy.py`
+RoboShop runs on EKS: its Applications are in `roboshop-ai/argocd-eks`. `scripts/argocd/deploy.py`
 and `validate.py` read both catalogs together (`scripts/lib/repos.py`: `CATALOGS`), so ownership, project and
 workload-inventory checks still cover the whole cluster; a name defined in both catalogs is an error.
 `workload-inventory.json` lists the workloads these apps must render.

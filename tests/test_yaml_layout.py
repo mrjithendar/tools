@@ -17,7 +17,7 @@ def active_yaml():
     for base in bases:
         assert base.is_dir(),base
         for p in base.rglob('*'):
-            if p.suffix not in ('.yaml','.yml') or any(x in p.parts for x in ('node_modules','.venv','__pycache__')):
+            if p.suffix not in ('.yaml','.yml') or any(x in p.parts for x in ('node_modules','.venv','__pycache__')) or ARGOCD/'apps' in p.parents:
                 continue
             yield p
 

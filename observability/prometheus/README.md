@@ -140,7 +140,7 @@ These queries also work in Grafana Explore with the Prometheus data source. If `
 
 ## Metrics from EKS
 
-The nodes of the `roboshop-demo` EKS cluster are in private subnets, so this Prometheus cannot scrape them. A Prometheus agent there (`infrastructure/eks-prometheus-agent.tf`) scrapes node-exporter and pushes to `https://jithendar.com/prometheus/api/v1/write`. Those series have `cluster="roboshop-demo"` and `job="eks-node-exporter"`.
+The nodes of the `roboshop-demo` EKS cluster are in private subnets, so this Prometheus cannot scrape them. A Prometheus agent there (`eks/applications/roboshop-demo-prometheus-agent.yaml`) scrapes node-exporter and pushes to `https://jithendar.com/prometheus/api/v1/write`. Those series have `cluster="roboshop-demo"` and `job="eks-node-exporter"`.
 
 That one path has its own Traefik login, `prometheus-remote-write-auth`, so EKS never holds the shared `monitoring-auth` password. The login only reaches the write endpoint. Create the same password on both clusters, before syncing this chart and applying the Terraform:
 

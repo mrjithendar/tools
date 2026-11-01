@@ -86,13 +86,49 @@ until step 6, which is expected.
 
 ## 4. Install the controllers and the NLB
 
-Billing for the NLB starts here. In `infrastructure/vars/terraform.tfvars` set `eks_ingress_enabled = true`, confirm your current
-address is still in `eks_ingress_source_cidrs` (`curl -s https://checkip.amazonaws.com`), then commit and push. **Create
-infrastructure** runs on the self-hosted runner.
+Billing for the NLB starts here. In `infrastructure/vars/terraform.tfvars` set `eks_ingress_enabled = true`, which creates the
+controller's IAM role and Pod Identity. Confirm your current address is still in `eks/platform/istio-ingressgateway.yaml`
+(`curl -s https://checkip.amazonaws.com`), then commit and push. **Create infrastructure** runs on the self-hosted runner.
 
 ```bash
 gh run watch -R mrjithendar/tools $(gh run list -R mrjithendar/tools --workflow 'Create infrastructure' --limit 1 --json databaseId -q '.[0].databaseId')
 ```
+
+Then sync the controllers from the hub, in this order. The issuers need the token from step 2 to become Ready:
+
+```bash
+kubectl --context $MK4 apply -f eks/applications/
+for a in metrics-server prometheus-agent letsencrypt-issuers aws-load-balancer-controller istio-base istiod istio-ingressgateway; do
+  argocd app diff argocd/roboshop-demo-$a
+  argocd app sync argocd/roboshop-demo-$a
+done
+```
+
+**Taking over the Helm releases Terraform installed.** Push first: `infrastructure/eks-argocd-handover.tf` makes Terraform forget
+them without uninstalling, and `terraform plan` must show `will no longer be managed` and `0 to destroy`. Run the same loop. The
+diffs should be Argo CD tracking metadata only, except `aws-load-balancer-controller`, whose webhook certificate moves to
+cert-manager: expect `Issuer` and `Certificate` resources and new webhook `caBundle` injection. Check that before going on:
+
+```bash
+kubectl --context $EKS -n kube-system wait certificate/aws-load-balancer-serving-cert --for=condition=Ready --timeout=3m
+kubectl --context $EKS get mutatingwebhookconfiguration aws-load-balancer-webhook -o jsonpath='{.webhooks[0].clientConfig.caBundle}' | wc -c
+kubectl --context $EKS -n istio-ingress rollout restart deployment/istio-ingressgateway
+kubectl --context $EKS -n istio-ingress rollout status deployment/istio-ingressgateway
+```
+
+Expected: `condition met`, a non-zero count, and a rollout that finishes, which proves the webhook still admits gateway pods.
+Then delete Helm's records so `helm list` stops showing releases nobody owns. **Never run `helm uninstall`: it deletes the
+workloads, and with the gateway Service the NLB.**
+
+```bash
+for r in kube-system/aws-load-balancer-controller kube-system/metrics-server istio-system/istio-base istio-system/istiod \
+  istio-ingress/istio-ingressgateway monitoring/prometheus-agent cert-manager/letsencrypt-issuers; do
+  kubectl --context $EKS -n ${r%/*} delete secret -l owner=helm,name=${r#*/}
+done
+```
+
+Finally delete `infrastructure/eks-argocd-handover.tf`, the `provider "helm"` block and `helm` in `required_providers` in
+`_provider.tf`, `data.aws_eks_cluster_auth` in `_data.tf`, and `mock_provider "helm"` in `tests/eks.tftest.hcl`, in one commit.
 
 Controller and IAM:
 
@@ -356,16 +392,17 @@ Everything below runs on mk4 and needs a new home first:
 |---|---|---|
 | Next.js website | `jithendar.com/`, `www.jithendar.com` | The apex record; `www` also needs adding to the Gateway and Certificate |
 | Argo CD | `/argocd` | It is the hub that deploys `roboshop-demo` to EKS |
-| Prometheus, Grafana | `/prometheus`, `/grafana` | `eks_prometheus_remote_write_url` |
+| Prometheus, Grafana | `/prometheus`, `/grafana` | `remoteWrite` in `eks/platform/prometheus-agent.yaml` |
 | Moks portal | `/moks` paths | Its own Argo application and schema |
 
-Then open the NLB. In `infrastructure/vars/terraform.tfvars` set:
+Then open the NLB. In `eks/platform/istio-ingressgateway.yaml` set:
 
-```hcl
-eks_ingress_source_cidrs = ["0.0.0.0/0"]
+```yaml
+loadBalancerSourceRanges:
+- 0.0.0.0/0
 ```
 
-Commit and push, then check it from an address outside the old list:
+Commit and push, sync `roboshop-demo-istio-ingressgateway`, then check it from an address outside the old list:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' --resolve jithendar.com:443:$NLB_IP https://jithendar.com/roboshop/
@@ -416,8 +453,17 @@ kubectl --context $EKS -n istio-ingress delete virtualservice,gateway,certificat
 kubectl --context $EKS -n roboshop-ai delete authorizationpolicy,peerauthentication --all
 ```
 
-Set `eks_ingress_enabled = false`, then commit and push. Terraform removes the gateway first, so the controller can delete the NLB
-and its security groups, then the controller and Istio. Delete the `roboshop-origin` record. Check nothing is left:
+Delete the gateway Service first, while the controller is still running, so it can delete the NLB and its security groups. Then
+remove the Applications and what they installed; they carry `Delete=false`, so deleting an Application leaves its resources:
+
+```bash
+kubectl --context $EKS -n istio-ingress delete service istio-ingressgateway
+kubectl --context $MK4 -n argocd delete application roboshop-demo-istio-ingressgateway roboshop-demo-istiod roboshop-demo-istio-base roboshop-demo-aws-load-balancer-controller
+kubectl --context $EKS delete namespace istio-ingress istio-system
+kubectl --context $EKS -n kube-system delete deployment aws-load-balancer-controller
+```
+
+Set `eks_ingress_enabled = false`, then commit and push. Delete the `roboshop-origin` record. Check nothing is left:
 
 ```bash
 aws elbv2 describe-load-balancers --names roboshop-demo-ingress 2>&1 | grep -c LoadBalancerNotFound
@@ -453,7 +499,7 @@ kubectl --context $EKS -n istio-ingress delete telemetry debug-access-logs
 | `502` or `504` on `/api/*`, and `web` not Ready | web cannot reach ai-gateway. The Service must have `appProtocol: tcp`. | `kubectl -n roboshop-ai get svc ai-gateway -o jsonpath='{.spec.ports[0].appProtocol}'`. Without it, `Host: jithendar.com` falls into passthrough and fails under STRICT. |
 | `403 RBAC: access denied`, or resets on ai-gateway | A policy is missing a legitimate caller. | `istioctl -n roboshop-ai proxy-config log deploy/<dest> --level rbac:debug` and read the log. Fix in Git, or use the fast rollback. |
 | `502` from Traefik, `tls: failed to verify` | The gateway serves no or the wrong certificate, or a staging one. | Step 5 `openssl` command. A staging issuer never passes. |
-| `502`/`504` from Traefik, timeout | mk4's address changed or left `eks_ingress_source_cidrs`, or the CNAME is wrong. | `dig`, the security group from step 4. Test from mk4. |
+| `502`/`504` from Traefik, timeout | mk4's address changed or left `eks/platform/istio-ingressgateway.yaml`, or the CNAME is wrong. | `dig`, the security group from step 4. Test from mk4. |
 | `ExternalName` errors in the Traefik log, `/roboshop` `404` | `allowExternalNameServices` not applied. | `kubectl --context mk4 -n traefik get deploy traefik -o yaml \| grep -i externalname`, then rerun `deploy-traefik.sh`. |
 | TLS handshake resets at the gateway | No `Gateway` synced, or the Secret is absent, so Envoy has no 443 filter chain. | `istioctl -n istio-ingress proxy-config listeners deploy/istio-ingressgateway --port 443`, `kubectl -n istio-ingress get secret`. |
 | Certificate stuck `False` | Issuer not ready or a DNS-01 failure. | `kubectl -n istio-ingress get certificaterequest,order,challenge`, `kubectl describe challenge`. `InvalidSolver` means the Cloudflare Secret is missing. A `403` from Cloudflare means the token lacks DNS edit on this zone. |

@@ -155,39 +155,6 @@ run "observability_addons" {
   }
 }
 
-run "prometheus_agent_off_by_default" {
-  command = plan
-  variables {
-    eks_enabled              = true
-    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
-  }
-  assert {
-    condition     = length(helm_release.prometheus_agent) == 0
-    error_message = "The agent must be opt-in."
-  }
-}
-
-run "prometheus_agent_pushes_remotely" {
-  command = plan
-  variables {
-    eks_enabled                     = true
-    eks_admin_principal_arns        = ["arn:aws:iam::123456789012:role/admin"]
-    eks_prometheus_remote_write_url = "https://example.com/api/v1/write"
-  }
-  assert {
-    condition     = length(helm_release.prometheus_agent) == 1
-    error_message = "A remote write URL must install the agent."
-  }
-}
-
-run "reject_plain_http_remote_write" {
-  command = plan
-  variables {
-    eks_prometheus_remote_write_url = "http://example.com/api/v1/write"
-  }
-  expect_failures = [var.eks_prometheus_remote_write_url]
-}
-
 run "network_observability_reuses_existing_scope" {
   command = plan
   variables {
@@ -232,31 +199,6 @@ run "cloudwatch_observability_enables_all_three" {
   }
 }
 
-run "letsencrypt_off_by_default" {
-  command = plan
-  variables {
-    eks_enabled              = true
-    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
-  }
-  assert {
-    condition     = length(helm_release.letsencrypt_issuers) == 0
-    error_message = "The issuers must be opt-in."
-  }
-}
-
-run "letsencrypt_uses_dns01" {
-  command = plan
-  variables {
-    eks_enabled              = true
-    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
-    eks_letsencrypt_dns_zone = "example.com"
-  }
-  assert {
-    condition     = yamldecode(helm_release.letsencrypt_issuers[0].values[0]).dns01.zone == "example.com"
-    error_message = "EKS issuers must solve DNS-01 for the configured zone."
-  }
-}
-
 run "ebs_csi_driver" {
   command = plan
   variables {
@@ -276,71 +218,31 @@ run "ingress_off_by_default" {
     eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
   }
   assert {
-    condition     = length(helm_release.aws_load_balancer_controller) == 0 && length(helm_release.istio_ingressgateway) == 0 && length(aws_iam_role.eks_load_balancer_controller) == 0
-    error_message = "A push to master must not create a billed NLB until ingress is explicitly enabled."
+    condition     = length(aws_iam_role.eks_load_balancer_controller) == 0
+    error_message = "The controller's IAM is opt-in."
   }
 }
+
 run "ingress_needs_eks" {
   command = plan
   variables {
-    eks_ingress_enabled      = true
-    eks_ingress_source_cidrs = ["203.0.113.10/32"]
+    eks_ingress_enabled = true
   }
   assert {
-    condition     = length(helm_release.aws_load_balancer_controller) == 0 && length(helm_release.istiod) == 0
-    error_message = "Ingress installs nothing without a cluster."
+    condition     = length(aws_iam_role.eks_load_balancer_controller) == 0
+    error_message = "Ingress creates nothing without a cluster."
   }
 }
-run "ingress_nlb_listeners_and_sources" {
+
+run "ingress_controller_identity" {
   command = plan
-  # The subnet IDs in these values are otherwise unknown at plan.
-  override_resource {
-    target          = aws_subnet.vpc_public_subnets
-    override_during = plan
-    values          = { id = "subnet-public" }
-  }
   variables {
     eks_enabled              = true
     eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
     eks_ingress_enabled      = true
-    eks_ingress_source_cidrs = ["203.0.113.10/32"]
-  }
-  assert {
-    condition     = [for p in yamldecode(helm_release.istio_ingressgateway[0].values[0]).service.ports : p.port] == [443, 80]
-    error_message = "Only 443 and 80 may be listeners: 15021 and metrics stay private."
-  }
-  assert {
-    condition     = yamldecode(helm_release.istio_ingressgateway[0].values[0]).service.loadBalancerSourceRanges == ["203.0.113.10/32"]
-    error_message = "The NLB must be limited to the configured sources."
-  }
-  assert {
-    condition     = yamldecode(helm_release.istio_ingressgateway[0].values[0]).service.loadBalancerClass == "service.k8s.aws/nlb"
-    error_message = "The gateway Service must be reconciled by the AWS Load Balancer Controller."
-  }
-  assert {
-    condition     = !can(yamldecode(helm_release.istio_ingressgateway[0].values[0]).service.annotations["service.beta.kubernetes.io/aws-load-balancer-ssl-cert"])
-    error_message = "TLS must terminate on the gateway, not on the NLB."
   }
   assert {
     condition     = aws_eks_pod_identity_association.load_balancer_controller[0].service_account == "aws-load-balancer-controller" && aws_eks_pod_identity_association.load_balancer_controller[0].namespace == "kube-system"
     error_message = "The controller's identity must bind to its own ServiceAccount."
   }
-}
-run "ingress_allows_public_sources" {
-  command = plan
-  variables { eks_ingress_source_cidrs = ["0.0.0.0/0"] }
-}
-run "ingress_rejects_invalid_sources" {
-  command = plan
-  variables { eks_ingress_source_cidrs = ["jithendar.com"] }
-  expect_failures = [var.eks_ingress_source_cidrs]
-}
-run "ingress_requires_sources" {
-  command = plan
-  variables {
-    eks_enabled              = true
-    eks_admin_principal_arns = ["arn:aws:iam::123456789012:role/admin"]
-    eks_ingress_enabled      = true
-  }
-  expect_failures = [helm_release.istio_ingressgateway]
 }

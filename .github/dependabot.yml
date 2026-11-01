@@ -31,7 +31,6 @@ updates:
   - package-ecosystem: docker
     directories:
       - /minikube/ecr-refresh
-      - /minikube/mongodb
       - /observability/loki
     schedule:
       interval: weekly

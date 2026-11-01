@@ -13,17 +13,12 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/lib'))
-from repos import ARGOCD, CATALOGS  # noqa: E402
+from repos import CATALOGS, MONITORING_ARGOCD  # noqa: E402
 ARGOCD_CHART_VERSION = '10.10.5'
-# Current shop only. Legacy apps, optional AI apps and existing data services
-# require an explicit name so this shortcut does not restore retired workloads.
-ROBOSHOP = ['roboshop-config', 'currency-service', 'catalogue-service',
-            'user-service', 'cart-service', 'payment-service', 'shipping-service',
-            'ai-gateway', 'mcp-server', 'moks', 'web']
 
 
 def catalog():
-    """Applications and AppProjects from every catalog (roboshop-ai/argocd and tools/argocd)."""
+    """Applications and AppProjects from the mk4 catalog (tools/argocd)."""
     docs = []
     for directory in CATALOGS:
         resources = yaml.safe_load((directory / 'kustomization.yaml').read_text())['resources']
@@ -61,11 +56,11 @@ def source_drift(live, desired):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, epilog=
-        'Examples: ./deploy-argocd.sh roboshop | ./deploy-argocd.sh web | '
+        'Examples: ./deploy-argocd.sh grafana | '
         './deploy-argocd.sh status. Requires kubectl and Python with PyYAML. '
         'Apps deploy their configured Git revision; commit/push workload changes first.')
     parser.add_argument('apps', nargs='*', default=['all'],
-                        help='install, app names, all, roboshop, list, or status (default: all)')
+                        help='install, app names, all, list, or status (default: all)')
     parser.add_argument('--context', default=os.getenv('KUBE_CONTEXT', 'mk4'))
     parser.add_argument('--dry-run', action='store_true', help='Print selection without accessing the cluster')
     parser.add_argument('--timeout', type=int, default=600, help='Seconds to wait for Synced/Healthy (default 600)')
@@ -74,17 +69,15 @@ def main():
     # Legacy explicit selection supports repairing an existing Argo-managed
     # cert-manager. It is never included by 'all' on a fresh Helm bootstrap.
     if 'cert-manager' in args.apps:
-        apps['cert-manager'] = yaml.safe_load((ARGOCD / 'cert-manager.yaml').read_text())
+        apps['cert-manager'] = yaml.safe_load((MONITORING_ARGOCD / 'cert-manager.yaml').read_text())
     if args.apps == ['list']:
-        print('all: every Application registered in roboshop-ai/argocd and tools/argocd')
-        print('roboshop: ' + ' '.join(ROBOSHOP))
+        print('all: every Application registered in tools/argocd')
         print('Available apps: ' + ' '.join(sorted(apps)))
         return
     if args.timeout <= 0:
         parser.error('--timeout must be positive')
     selected = list(dict.fromkeys(name for item in args.apps
-                                  for name in (sorted(apps) if item == 'all' else
-                                               ROBOSHOP if item == 'roboshop' else [item])))
+                                  for name in (sorted(apps) if item == 'all' else [item])))
     if 'install' in args.apps and args.apps != ['install']:
         parser.error('Run install separately before selecting applications')
     if args.apps not in (['status'], ['install']):

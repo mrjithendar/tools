@@ -68,13 +68,13 @@ INTERNAL_PASSWORD_KEYS = (
 
 
 # Volumes whose databases keep the credentials they were initialized with.
-DATA_CLAIMS = ('mongodb-data', 'shipping-postgres', 'rabbitmq-data')
+DATA_CLAIMS = ('mongodb-data', 'data-mongodb-0', 'shipping-postgres', 'rabbitmq-data')
 
 
 def ensure_app_secrets(context, accept_new_credentials=False):
     """Create fresh credentials once; existing credentials are never rotated."""
     kube = ['kubectl', '--context', context, '--request-timeout=20s']
-    subprocess.check_call(kube + ['apply', '--server-side', '-f', str(ROOT / 'minikube/namespaces/roboshop-ai.yaml')])
+    subprocess.check_call(kube + ['apply', '--server-side', '-f', str(ROOT / 'eks/roboshop/roboshop-ai-namespace.yaml')])
     existing = subprocess.check_output(kube + ['-n', 'roboshop-ai', 'get', 'secret',
         'roboshop-secrets', '--ignore-not-found', '-o', 'json'], text=True)
     if existing.strip():

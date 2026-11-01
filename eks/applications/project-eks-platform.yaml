@@ -1,0 +1,48 @@
+# Controllers and add-ons on the roboshop-demo cluster. Separate from "platform", which is mk4's and "eks", which is the shop.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: eks-platform
+  namespace: argocd
+spec:
+  description: Controllers on the roboshop-demo EKS cluster, managed from Argo CD on mk4
+  sourceRepos:
+  - https://github.com/mrjithendar/tools.git
+  - https://aws.github.io/eks-charts
+  - https://istio-release.storage.googleapis.com/charts
+  - https://kubernetes-sigs.github.io/metrics-server/
+  - https://prometheus-community.github.io/helm-charts
+  destinations:
+  - namespace: kube-system
+    name: roboshop-demo
+  - namespace: istio-system
+    name: roboshop-demo
+  - namespace: istio-ingress
+    name: roboshop-demo
+  - namespace: monitoring
+    name: roboshop-demo
+  - namespace: cert-manager
+    name: roboshop-demo
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRoleBinding
+  - group: apiextensions.k8s.io
+    kind: CustomResourceDefinition
+  - group: apiregistration.k8s.io
+    kind: APIService
+  - group: admissionregistration.k8s.io
+    kind: MutatingWebhookConfiguration
+  - group: admissionregistration.k8s.io
+    kind: ValidatingWebhookConfiguration
+  - group: cert-manager.io
+    kind: ClusterIssuer
+  namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+  namespaceResourceBlacklist:
+  - group: ''
+    kind: Secret

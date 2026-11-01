@@ -14,15 +14,13 @@ module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 def test_catalog_has_unique_safe_ownership():
     apps,owners=module.validate()
     names={app['metadata']['name'] for app in apps}
-    assert {'moks','catalogue-service'} <= names
+    assert {'grafana','loki'} <= names
+    assert not {'moks','catalogue-service','web'} & names
     assert not {'shopping-agent','product-ingestion','jfrog'} & names
     assert not {'argocd','traefik','coredns','kube-proxy','kindnet'}&names
-    assert len(apps)==20  # roboshop-ai/argocd (16) + tools/argocd (4); jaeger, otel-collector, shared-tls, roboshop-letsencrypt retired
-    assert owners[('apps','Deployment','roboshop-ai','web')]=='web'
+    assert len(apps)==4  # tools/argocd; RoboShop is on EKS (roboshop-ai/argocd-eks)
     assert 'cert-manager' not in names
-    assert owners[('apps','Deployment','roboshop-ai','mongodb')]=='mongodb'
-    assert ('apps','StatefulSet','roboshop-ai','mongodb') not in owners
-    assert owners[('apps','StatefulSet','roboshop-ai','kafka')]=='kafka-bridge'
+    assert not any(ns=='roboshop-ai' and kind in ('Deployment','StatefulSet') for _,kind,ns,_ in owners)
 
 
 def test_catalog_contains_only_projects_and_applications():
@@ -56,8 +54,8 @@ def test_helm_releases_keep_names_and_pinned_versions():
 
 
 def test_shared_namespace_has_valid_metadata():
-    namespace=yaml.safe_load((ROOT/'minikube/roboshop/roboshop-ai-namespace.yaml').read_text())
-    config=yaml.safe_load((ROOT/'minikube/roboshop/roboshop-config-configmap.yaml').read_text())
+    namespace=yaml.safe_load((ROOT/'eks/roboshop/roboshop-ai-namespace.yaml').read_text())
+    config=yaml.safe_load((ROOT/'eks/roboshop/roboshop-config-configmap.yaml').read_text())
     assert 'LOG_FORMAT' not in namespace['metadata']
     assert config['data']['LOG_FORMAT']=='json'
 
@@ -96,11 +94,10 @@ def test_required_inventory_matches_active_catalog_and_rejects_missing_workloads
     import json
     import pytest
     from repos import CATALOGS
-    # Required workloads come from both catalogs (roboshop-ai/argocd and tools/argocd).
     expected={tuple(row) for directory in CATALOGS for row in json.loads((directory/'workload-inventory.json').read_text())}
     assert not any(name in ('product-ingestion','shopping-agent') for _,ns,name in expected)
-    assert ('Deployment','roboshop-ai','moks') in expected
-    assert ('Deployment','roboshop-ai','catalogue-service') in expected
+    assert ('Deployment','monitoring','grafana') in expected
+    assert not any(ns=='roboshop-ai' for _,ns,_ in expected)
     module.validate_inventory(expected)
     # Every remaining entry stays mandatory, including chart-generated workloads.
     for workload in expected:
@@ -118,18 +115,11 @@ def test_external_validation_calls_required_inventory(monkeypatch):
 
 
 def test_frontend_and_nginx_are_retired_into_web():
-    import json
     import yaml
-    inventory={tuple(row) for row in json.loads((ARGOCD/'workload-inventory.json').read_text())}
-    assert ('Deployment','roboshop-ai','web') in inventory
-    assert not {('Deployment','roboshop-ai','frontend'),('Deployment','roboshop-ai','nginx')} & inventory
     resources=yaml.safe_load((ARGOCD/'kustomization.yaml').read_text())['resources']
     assert 'web.yaml' in resources and not {'frontend.yaml','nginx.yaml'} & set(resources)
     assert (APP/'services/web').is_dir()
     assert not (APP/'services/frontend').exists() and not (APP/'services/nginx').exists()
-    for name in ('roboshop-ingress.yaml','roboshop-http-ingress.yaml'):
-        ingress=yaml.safe_load((ROOT/'minikube/roboshop'/name).read_text())
-        assert ingress['spec']['rules'][0]['http']['paths'][0]['backend']['service']['name']=='web'
 
 
 def test_retired_ingestion_has_no_deployable_or_runtime_references():
@@ -152,7 +142,7 @@ def test_retired_ingestion_has_no_deployable_or_runtime_references():
 def test_monitoring_stack_lives_in_tools_catalog():
     import json
     from repos import CATALOGS, MONITORING_ARGOCD
-    assert MONITORING_ARGOCD in CATALOGS and ARGOCD in CATALOGS
+    assert MONITORING_ARGOCD in CATALOGS and ARGOCD not in CATALOGS
     tools=yaml.safe_load((MONITORING_ARGOCD/'kustomization.yaml').read_text())['resources']
     shop=yaml.safe_load((ARGOCD/'kustomization.yaml').read_text())['resources']
     moved={'grafana.yaml','prometheus.yaml','loki.yaml','project-logging.yaml'}
@@ -162,7 +152,6 @@ def test_monitoring_stack_lives_in_tools_catalog():
     # Their workloads are required by the tools inventory, not roboshop-ai's.
     monitoring={tuple(r) for r in json.loads((MONITORING_ARGOCD/'workload-inventory.json').read_text())}
     assert {('Deployment','monitoring',n) for n in ('alloy','grafana','loki','prometheus')} <= monitoring
-    assert not any(ns=='monitoring' for _,ns,_ in json.loads((ARGOCD/'workload-inventory.json').read_text()))
     # Every monitoring app reads its sources from tools.git (or a pinned chart repository).
     for doc in module.catalog():
         if doc['kind']=='Application' and doc['metadata']['name'] in ('grafana','prometheus','loki'):
@@ -170,10 +159,11 @@ def test_monitoring_stack_lives_in_tools_catalog():
                 assert source['repoURL'].startswith(('https://github.com/mrjithendar/tools.git','https://grafana-community.github.io/')),source
 
 
-def test_deploy_catalog_merges_both_catalogs():
+def test_deploy_catalog_holds_only_mk4_apps():
     import importlib.util as util
     spec=util.spec_from_file_location('catalog_deploy',ROOT/'scripts/argocd/deploy.py')
     deploy=util.module_from_spec(spec);spec.loader.exec_module(deploy)
     apps,projects=deploy.catalog()
-    assert {'grafana','prometheus','loki','web','moks'} <= set(apps)
+    assert {'grafana','prometheus','loki'} <= set(apps)
+    assert not {'web','moks'} & set(apps)
     assert {'platform','logging'} <= set(projects)

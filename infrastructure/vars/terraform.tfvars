@@ -28,13 +28,7 @@ eks_network_observability_enabled = true
 # Created through the EKS console; AWS allows one scope per account and region.
 eks_network_flow_monitor_scope_arn = "arn:aws:networkflowmonitor:us-east-1:881026659929:scope/d894fc8f-92ab-4c38-a32a-04fb931bcbf1"
 
-eks_prometheus_remote_write_url = "https://jithendar.com/prometheus/api/v1/write"
-
 eks_cloudwatch_observability_enabled = false
 
-eks_letsencrypt_dns_zone = "jithendar.com"
-
-# Installs the load balancer controller and Istio and creates a billed NLB (eks/RUNBOOK.md step 4).
-# Addresses allowed to reach it: mk4's edge, home IP. Becomes 0.0.0.0/0 at eks/RUNBOOK.md, Retiring mk4.
-eks_ingress_enabled      = true
-eks_ingress_source_cidrs = ["46.224.38.14/32", "122.177.247.138/32"]
+# IAM for the load balancer controller. Controllers and allowed addresses: eks/applications, eks/platform.
+eks_ingress_enabled = true
