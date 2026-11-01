@@ -72,7 +72,7 @@ git add -A && git commit -m 'EKS ingress and mesh, disabled' && git push
 Then register the Applications. This changes nothing on either cluster, because none of them sync automatically:
 
 ```bash
-kubectl --context $MK4 apply -f argocd/project-platform.yaml
+kubectl --context $MK4 apply -f argocd/project-mk-platform.yaml
 kubectl --context $MK4 apply -f eks/applications/
 kubectl --context $MK4 apply -k ../roboshop-ai/argocd-eks
 ```

@@ -4,8 +4,8 @@ Applications for the shared monitoring stack, whose sources live in this reposit
 
 | Application | Project | Source | Namespace |
 |---|---|---|---|
-| `grafana` | `platform` | grafana-community chart 14.0.1 + `observability/grafana/values.yaml` + `observability/grafana/dashboards` | `monitoring` |
-| `prometheus` | `platform` | `observability/prometheus` (local chart) | `monitoring` |
+| `grafana` | `mk-platform` | grafana-community chart 14.0.1 + `observability/grafana/values.yaml` + `observability/grafana/dashboards` | `monitoring` |
+| `prometheus` | `mk-platform` | `observability/prometheus` (local chart) | `monitoring` |
 | `loki` (Loki + Alloy) | `logging` (defined here) | `observability/loki` | `monitoring` |
 
 RoboShop runs on EKS: its Applications are in `roboshop-ai/argocd-eks`. `scripts/argocd/deploy.py`

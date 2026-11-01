@@ -46,7 +46,7 @@ def test_existing_settings_preserved_and_no_pruning():
     app['spec']['syncPolicy']['syncOptions'] = app['spec']['syncPolicy']['syncOptions'] + ['RespectIgnoreDifferences=true']
     listing = json.dumps({'items': [healthy(app)]})
     with patch('sys.argv', ['deploy', 'loki']), patch.object(deploy.subprocess, 'check_output',
-            side_effect=['crd/applications', 'crd/appprojects', listing, 'appproject/platform', 'patched\n', listing]) as run:
+            side_effect=['crd/applications', 'crd/appprojects', listing, 'appproject/mk-platform', 'patched\n', listing]) as run:
         deploy.main()
     commands = [call.args[0] for call in run.call_args_list]
     assert all('create' not in c and 'apply' not in c and '--type=json' not in c for c in commands)
@@ -62,7 +62,7 @@ def test_stale_live_source_aligned_with_git_before_sync():
     stale = json.loads(json.dumps(git))
     stale['spec']['source']['path'] = 'observability/retired'
     stale['spec']['sources'] = [{'repoURL': 'https://example.invalid'}]
-    responses = ['crd', 'crd', json.dumps({'items': [stale]}), 'appproject/platform',
+    responses = ['crd', 'crd', json.dumps({'items': [stale]}), 'appproject/mk-platform',
                  'patched', 'patched', json.dumps({'items': [healthy(git)]})]
     with patch('sys.argv', ['deploy', 'loki']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run:
         deploy.main()
@@ -78,7 +78,7 @@ def test_destination_moves_are_aligned_and_use_git_namespace():
     git = deploy.catalog()[0]['prometheus']
     stale = json.loads(json.dumps(git))
     stale['spec']['destination']['namespace'] = 'roboshop-ai'
-    responses = ['crd', 'crd', json.dumps({'items': [stale]}), 'appproject/platform',
+    responses = ['crd', 'crd', json.dumps({'items': [stale]}), 'appproject/mk-platform',
                  'patched', 'patched', json.dumps({'items': [healthy(git)]})]
     with patch('sys.argv', ['deploy', 'prometheus']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run, \
             patch.object(deploy.subprocess, 'check_call') as apply:
@@ -94,7 +94,7 @@ def test_missing_git_sync_options_added_and_live_extras_kept():
     stale = json.loads(json.dumps(git))
     stale['spec']['syncPolicy'] = {'syncOptions': ['FailOnSharedResource=true', 'RespectIgnoreDifferences=true'],
                                    'retry': {'limit': 2}}
-    responses = ['crd', 'crd', json.dumps({'items': [stale]}), 'appproject/platform',
+    responses = ['crd', 'crd', json.dumps({'items': [stale]}), 'appproject/mk-platform',
                  'patched', 'patched', json.dumps({'items': [healthy(git)]})]
     with patch('sys.argv', ['deploy', 'cert-manager']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run:
         deploy.main()
@@ -112,7 +112,7 @@ def test_synced_app_tracking_no_resources_fails():
     empty = healthy(app); empty['status']['resources'] = []
     listing = json.dumps({'items': [empty]})
     with patch('sys.argv', ['deploy', 'loki']), patch.object(deploy.subprocess, 'check_output',
-            side_effect=['crd', 'crd', listing, 'appproject/platform', 'patched', listing]):
+            side_effect=['crd', 'crd', listing, 'appproject/mk-platform', 'patched', listing]):
         with pytest.raises(RuntimeError, match='tracks no resources'):
             deploy.main()
 
@@ -204,12 +204,12 @@ def test_helm_list_version_compatibility_and_pending_release(help_text, uses_all
 
 
 def test_missing_controller_installed_before_application_sync():
-    healthy = {'metadata': {'name': 'loki'}, 'spec': {'project': 'platform'},
+    healthy = {'metadata': {'name': 'loki'}, 'spec': {'project': 'mk-platform'},
                'status': {'operationState': {'phase': 'Succeeded'},
                           'sync': {'status': 'Synced'}, 'health': {'status': 'Healthy'},
                           'resources': [{'kind': 'Deployment', 'name': 'loki'}]}}
     responses = ['', '--all-namespaces', '[]', '', 'established', 'established',
-                 '{"items":[]}', 'appproject/platform', 'created', 'patched',
+                 '{"items":[]}', 'appproject/mk-platform', 'created', 'patched',
                  json.dumps({'items': [healthy]})]
     with patch('sys.argv', ['deploy', 'loki', '--context', 'fresh']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as read, patch.object(deploy.subprocess, 'check_call') as install:
         deploy.main()
@@ -234,7 +234,7 @@ def test_cert_manager_sync_carries_namespace_and_ssa_options(existing):
     app['status'] = {'operationState': {'phase': 'Succeeded'},
                      'sync': {'status': 'Synced'}, 'health': {'status': 'Healthy'},
                      'resources': [{'kind': 'Deployment', 'name': 'loki'}]}
-    responses = ['crd/applications', 'crd/appprojects', json.dumps({'items': [app] if existing else []}), 'appproject/platform']
+    responses = ['crd/applications', 'crd/appprojects', json.dumps({'items': [app] if existing else []}), 'appproject/mk-platform']
     if not existing:
         responses.append('created')
     responses += ['patched', json.dumps({'items': [app]})]

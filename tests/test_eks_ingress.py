@@ -158,7 +158,7 @@ def test_applications_are_manual_and_allowed_by_the_project(name, dest, project_
     app = load(EKS / f'applications/{name}.yaml')
     assert 'automated' not in app['spec'].get('syncPolicy', {})
     assert app['spec']['destination'] == {'name': dest, 'namespace': project_dest}
-    allowed = load(ROOT / 'argocd/project-platform.yaml')['spec']['destinations']
+    allowed = load(EKS / 'applications/project-eks-platform.yaml')['spec']['destinations']
     assert {'namespace': project_dest, 'name': dest} in allowed
 
 

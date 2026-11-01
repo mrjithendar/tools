@@ -1,4 +1,4 @@
-# Controllers and add-ons on the roboshop-demo cluster. Separate from "platform", which is mk4's and "eks", which is the shop.
+# Controllers and add-ons on the roboshop-demo cluster. Separate from "mk-platform", which is mk4's, and "eks", which is the shop.
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
@@ -19,6 +19,8 @@ spec:
   - namespace: istio-system
     name: roboshop-demo
   - namespace: istio-ingress
+    name: roboshop-demo
+  - namespace: roboshop-ai
     name: roboshop-demo
   - namespace: monitoring
     name: roboshop-demo

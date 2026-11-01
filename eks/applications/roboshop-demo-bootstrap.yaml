@@ -10,7 +10,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-options: Prune=false,Delete=false
 spec:
-  project: platform
+  project: eks-platform
   destination:
     name: roboshop-demo
     namespace: roboshop-ai
