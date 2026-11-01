@@ -20,6 +20,7 @@ Like the mk4 Applications, they do not sync automatically and must never be sync
 | `manifests/cert-manager/` | Let's Encrypt ClusterIssuers, plain YAML | Argo CD: `roboshop-demo-letsencrypt-issuers` |
 | `manifests/ingress/` | Certificate, Gateway, VirtualServices, plain YAML | Argo CD: `roboshop-demo-ingress` |
 | `manifests/bootstrap/` | ConfigMap that proves Argo CD can reach the cluster, plain YAML | Argo CD: `roboshop-demo-bootstrap` |
+| `manifests/alloy/` | Alloy, which pushes pod logs to Loki on mk4, plain YAML | Argo CD: `roboshop-demo-alloy` |
 | `examples/` | Secret templates. Never applied; see [DEPLOY.md](DEPLOY.md#required-configuration) | By hand |
 | `applications/roboshop-demo-kiali*.yaml` | Kiali at `/kiali` and the small Prometheus it queries | Argo CD, project `eks-platform`; [steps](RUNBOOK.md#kiali) |
 | `roboshop-ai/argocd-eks` | The workloads, their Applications, the namespace and shared config, the MongoDB catalog, and mesh identities and policies (`apps/mesh`) | Argo CD, project `eks` |

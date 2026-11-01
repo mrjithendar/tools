@@ -97,7 +97,7 @@ Then sync the controllers from the hub, in this order. The issuers need the toke
 
 ```bash
 kubectl --context $MK4 apply -f deploy/eks/applications/
-for a in metrics-server prometheus-agent letsencrypt-issuers aws-load-balancer-controller istio-base istiod istio-ingressgateway; do
+for a in metrics-server prometheus-agent alloy letsencrypt-issuers aws-load-balancer-controller istio-base istiod istio-ingressgateway; do
   argocd app diff argocd/roboshop-demo-$a
   argocd app sync argocd/roboshop-demo-$a
 done
@@ -342,6 +342,7 @@ and stop being reachable at `jithendar.com` unless they have moved first:
 | Next.js website | `jithendar.com/`, `www.jithendar.com` | The apex record; `www` also needs adding to the Gateway and Certificate |
 | Argo CD | `/argocd` | It is the hub that deploys `roboshop-demo`; the `argocd` CLI logs in through this path |
 | Prometheus, Grafana | `/prometheus`, `/grafana` | `remoteWrite` in `deploy/eks/helm-values/prometheus-agent.yaml` |
+| Loki | `/loki/api/v1/` | `loki.write` in `deploy/eks/manifests/alloy/alloy-config-configmap.yaml`, and the Loki connector in Moks |
 | Moks portal | `/moks` paths | Its own Argo application and schema |
 
 Open the NLB. In `deploy/eks/helm-values/istio-ingressgateway.yaml` set:

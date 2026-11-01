@@ -1,0 +1,78 @@
+# One collector tails the Kubernetes API and pushes to the Loki on mk4, which cannot reach these private nodes.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alloy
+  namespace: monitoring
+spec:
+  replicas: 1
+  # Two collectors at once would push every line twice.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: alloy
+  template:
+    metadata:
+      labels:
+        app: alloy
+    spec:
+      securityContext:
+        runAsUser: 473
+        runAsGroup: 473
+        runAsNonRoot: true
+        fsGroup: 473
+      serviceAccountName: alloy
+      automountServiceAccountToken: true
+      containers:
+      - name: alloy
+        image: grafana/alloy:v1.21.2
+        args:
+        - run
+        - --server.http.listen-addr=0.0.0.0:12345
+        - --storage.path=/var/alloy
+        - /etc/alloy/config.alloy
+        ports:
+        - name: http
+          containerPort: 12345
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 384Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: config
+          mountPath: /etc/alloy
+          readOnly: true
+        - name: loki-push-auth
+          mountPath: /etc/secrets/loki-push
+          readOnly: true
+        - name: data
+          mountPath: /var/alloy
+        - name: tmp
+          mountPath: /tmp
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: http
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: alloy-config
+      - name: loki-push-auth
+        secret:
+          secretName: loki-push-auth
+      # Read positions only. A new pod re-reads what the nodes still hold, and Loki drops the lines it already has.
+      - name: data
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}

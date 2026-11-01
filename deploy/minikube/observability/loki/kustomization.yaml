@@ -8,6 +8,10 @@ resources:
 - alloy-data-pvc.yaml
 - loki-deployment.yaml
 - loki-service.yaml
+- loki-push-auth-middleware.yaml
+- loki-push-ingress.yaml
+- loki-read-auth-middleware.yaml
+- loki-read-ingress.yaml
 - alloy-deployment.yaml
 - alloy-service.yaml
 configMapGenerator:

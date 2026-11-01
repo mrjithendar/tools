@@ -32,6 +32,11 @@ spec:
     kind: PersistentVolumeClaim
   - group: apps
     kind: Deployment
+  # Loki's authenticated routes: reads for MOKS on EKS, and the push that EKS sends logs through.
+  - group: networking.k8s.io
+    kind: Ingress
+  - group: traefik.io
+    kind: Middleware
   # Argo CD leaves unlisted kinds out of the app tree, so these two are what show the pods, logs and events.
   - group: apps
     kind: ReplicaSet

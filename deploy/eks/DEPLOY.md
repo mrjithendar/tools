@@ -39,6 +39,7 @@ Expected: every node `Ready`.
 |---|---|---|---|
 | `cloudflare-api-token` | `cert-manager` | `api-token` | ClusterIssuers (DNS-01) |
 | `prometheus-remote-write-auth` | `monitoring` | `password` | Prometheus agent. The same password must be on mk4. |
+| `loki-push-auth` | `monitoring` | `password` | Alloy. The same password must be on mk4. |
 | `kiali-signing-key` | `istio-system` | `key` | Kiali login tokens |
 | `roboshop-secrets` | `roboshop-ai` | See `roboshop-ai` | RoboShop workloads. Not owned by this repository. |
 
@@ -78,7 +79,13 @@ kubectl --context $EKS create namespace monitoring
 kubectl --context $EKS -n monitoring create secret generic prometheus-remote-write-auth --from-literal=password="$PASS"
 unset PASS
 
-for a in metrics-server prometheus-agent aws-load-balancer-controller istio-base istiod istio-ingressgateway; do
+PASS=$(openssl rand -hex 32)
+kubectl --context $MK4 -n monitoring create secret generic loki-push-auth \
+  --type=kubernetes.io/basic-auth --from-literal=username=eks --from-literal=password="$PASS"
+kubectl --context $EKS -n monitoring create secret generic loki-push-auth --from-literal=password="$PASS"
+unset PASS
+
+for a in metrics-server prometheus-agent alloy aws-load-balancer-controller istio-base istiod istio-ingressgateway; do
   argocd app diff argocd/roboshop-demo-$a
   argocd app sync argocd/roboshop-demo-$a
   argocd app wait argocd/roboshop-demo-$a --health --timeout 300

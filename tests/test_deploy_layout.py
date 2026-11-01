@@ -12,8 +12,9 @@ MINIKUBE = ROOT / 'deploy/minikube'
 MANIFESTS = EKS / 'manifests'
 APPS = EKS / 'applications'
 HUB_NAMESPACE = 'argocd'
-NAMESPACED = {'Certificate', 'ConfigMap', 'Gateway', 'VirtualService'}
-CLUSTER_SCOPED = {'ClusterIssuer'}
+NAMESPACED = {'Certificate', 'ConfigMap', 'Deployment', 'Gateway', 'ServiceAccount', 'VirtualService'}
+CLUSTER_SCOPED = {'ClusterIssuer', 'ClusterRole', 'ClusterRoleBinding'}
+ALLOY_CONFIG = MANIFESTS / 'alloy/alloy-config-configmap.yaml'  # Its {{ }} are Alloy templates, and nothing renders the file
 
 
 def documents(path):
@@ -42,7 +43,7 @@ def test_eks_has_no_kustomize_or_helm_chart_of_its_own():
     assert not any(p.name == 'templates' for p in EKS.rglob('*') if p.is_dir())
     for path in MANIFESTS.rglob('*'):
         assert path.suffix == '.yaml' or path.is_dir(), path
-        assert '{{' not in (path.read_text() if path.is_file() else ''), path
+        assert path == ALLOY_CONFIG or '{{' not in (path.read_text() if path.is_file() else ''), path
 
 
 @pytest.mark.parametrize('app', eks_apps(), ids=lambda a: a['metadata']['name'])
@@ -53,7 +54,7 @@ def test_eks_applications_never_invoke_kustomize_or_read_minikube(app):
         assert 'deploy/minikube' not in yaml.safe_dump(source)
 
 
-@pytest.mark.parametrize('name', ['ingress', 'bootstrap', 'letsencrypt-issuers'])
+@pytest.mark.parametrize('name', ['alloy', 'ingress', 'bootstrap', 'letsencrypt-issuers'])
 def test_plain_applications_force_a_directory_source(name):
     source = yaml.safe_load((APPS / f'roboshop-demo-{name}.yaml').read_text())['spec']['source']
     # A non-empty directory block is what stops Argo CD detecting a source type, so a stray kustomization.yaml cannot switch it.
@@ -154,6 +155,8 @@ def test_secrets_the_helm_values_need_have_templates():
     assert documents_example('kiali-signing-key-secret')['metadata']['name'] in yaml.safe_load((EKS / 'helm-values/kiali.yaml').read_text())['login_token']['signing_key']
     server = yaml.safe_load((EKS / 'helm-values/prometheus-agent.yaml').read_text())['server']
     assert server['extraSecretMounts'][0]['secretName'] == documents_example('prometheus-remote-write-auth-secret')['metadata']['name']
+    alloy = yaml.safe_load((MANIFESTS / 'alloy/alloy-deployment.yaml').read_text())['spec']['template']['spec']
+    assert documents_example('loki-push-auth-secret')['metadata']['name'] in {v.get('secret', {}).get('secretName') for v in alloy['volumes']}
 
 
 def eks_operating_files():

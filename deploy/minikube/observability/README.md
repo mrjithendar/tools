@@ -39,8 +39,12 @@ deploys the Git revision on `master`, so commit and push changes before syncing.
 
 - Grafana: **https://jithendar.com/grafana/**
 - Prometheus: **https://jithendar.com/prometheus/** (Traefik BasicAuth)
-- Loki and Jaeger: cluster-internal only. Use Grafana Explore for logs, or
-  `kubectl -n roboshop-ai port-forward svc/jaeger 16686` for the Jaeger UI.
+- Loki: read-only API under **https://jithendar.com/loki/api/v1/** (Traefik BasicAuth,
+  [`loki-read-auth`](loki/README.md#remote-read-moks-on-eks)), for MOKS on EKS, and
+  push from EKS at `/loki/api/v1/push` with its own login,
+  [`loki-push-auth`](loki/README.md#remote-push-logs-from-eks). Use Grafana Explore for logs.
+- Jaeger: cluster-internal only. Use
+  `kubectl -n roboshop-ai port-forward svc/jaeger 16686` for the UI.
 
 TLS comes from the shared `jithendar/jithendar-com` Certificate, served to every
 route through Traefik's default TLSStore (`shared-tls` Application). The monitoring

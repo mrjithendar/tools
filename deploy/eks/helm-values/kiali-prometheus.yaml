@@ -1,5 +1,5 @@
-# Mesh and kube-state metrics that Kiali and the MOKS portal query; the prometheus-agent cannot be queried and only pushes
-# node and kube-state metrics to mk4. Short retention, no volume: a restart loses recent traffic graphs and nothing else.
+# Mesh, kube-state and container metrics that Kiali and the MOKS portal query; the prometheus-agent cannot be queried and only
+# pushes node and kube-state metrics to mk4. MOKS rightsizing and FinOps read up to 30 days, so the data sits on a volume.
 alertmanager:
   enabled: false
 kube-state-metrics:
@@ -10,8 +10,14 @@ prometheus-pushgateway:
   enabled: false
 server:
   persistentVolume:
-    enabled: false
-  retention: 6h
+    enabled: true
+    size: 10Gi
+    storageClass: gp3-encrypted
+  # The volume is ReadWriteOnce: a rolling update would wait forever for the old pod to let go of it.
+  strategy:
+    type: Recreate
+  retention: 31d
+  retentionSize: 8GB
   global:
     scrape_interval: 30s
   resources:
@@ -58,6 +64,21 @@ serverFiles:
       - source_labels:
         - __name__
         regex: kube_(pod_status_phase|pod_status_ready|pod_container_status_(restarts_total|waiting_reason|last_terminated_reason)|pod_container_resource_(requests|limits)|deployment_(spec_replicas|status_replicas_available)|statefulset_(replicas|status_replicas_ready)|daemonset_status_(desired_number_scheduled|number_ready)|horizontalpodautoscaler_(spec_max_replicas|status_current_replicas|status_desired_replicas)|node_status_(condition|allocatable)|persistentvolumeclaim_status_phase|job_status_failed)
+        action: keep
+    # Container usage from each kubelet, bounded to the series MOKS reads. nodes/metrics is already in the chart's ClusterRole.
+    - job_name: kubelet-cadvisor
+      scheme: https
+      metrics_path: /metrics/cadvisor
+      authorization:
+        credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      tls_config:
+        insecure_skip_verify: true
+      kubernetes_sd_configs:
+      - role: node
+      metric_relabel_configs:
+      - source_labels:
+        - __name__
+        regex: container_(cpu_usage_seconds_total|cpu_cfs_periods_total|cpu_cfs_throttled_periods_total|memory_working_set_bytes|spec_memory_limit_bytes|oom_events_total|network_(receive|transmit)_bytes_total)
         action: keep
     - job_name: istiod
       kubernetes_sd_configs:

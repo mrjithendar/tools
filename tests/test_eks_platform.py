@@ -48,7 +48,7 @@ def test_project_allows_every_destination_and_source(release, namespace):
 
 def test_plain_applications_are_allowed_by_the_project():
     project = load(APPS / 'project-eks-platform.yaml')['spec']
-    for name, namespace in (('letsencrypt-issuers', 'cert-manager'), ('ingress', 'istio-ingress'), ('bootstrap', 'roboshop-ai')):
+    for name, namespace in (('letsencrypt-issuers', 'cert-manager'), ('ingress', 'istio-ingress'), ('bootstrap', 'roboshop-ai'), ('alloy', 'monitoring')):
         spec = app(name)['spec']
         assert spec['project'] == 'eks-platform'
         assert spec['destination'] == {'name': 'roboshop-demo', 'namespace': namespace}
