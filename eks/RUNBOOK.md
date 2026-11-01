@@ -372,6 +372,33 @@ kubectl --context $EKS -n roboshop-ai logs deploy/web -c web --since=2m | tail -
 Expected: `308 https://jithendar.com/roboshop/?utm=x`; `HTTP/2 200` with `server: istio-envoy`; `301` to HTTPS; requests in the EKS
 web log. Then repeat the browser flow from step 7 without the `/etc/hosts` line.
 
+## Kiali
+
+Read-only mesh dashboard, served by the gateway at `/kiali`. It needs steps 2 and 5 for the certificate, and shows traffic only
+for workloads with sidecars, from step 6. `jithendar.com` must point at the NLB (step 10) to open it by name; until then use the
+port-forward below, or the `/etc/hosts` line from step 7.
+
+The signing key is created by hand, so it stays out of Git and does not change between renders. Sync after it exists:
+
+```bash
+kubectl --context $EKS -n istio-system create secret generic kiali-signing-key --from-literal=key="$(openssl rand -hex 16)"
+kubectl --context $MK4 apply -f eks/applications/project-eks-platform.yaml
+kubectl --context $MK4 apply -f eks/applications/roboshop-demo-kiali.yaml -f eks/applications/roboshop-demo-kiali-prometheus.yaml
+argocd app sync argocd/roboshop-demo-kiali-prometheus
+argocd app sync argocd/roboshop-demo-kiali
+argocd app sync argocd/roboshop-demo-ingress
+kubectl --context $EKS -n istio-system rollout status deployment/kiali
+kubectl --context $EKS -n istio-system port-forward svc/kiali 20001:20001
+```
+
+Open `http://localhost:20001/kiali`, and sign in with a token that lasts one working day:
+
+```bash
+kubectl --context $EKS -n istio-system create token kiali --duration=8h
+```
+
+Anyone with that token can read the mesh, including at `/kiali` once the NLB is public. Do not share it.
+
 ## Retiring mk4
 
 Once the site has been stable long enough to trust: remove `46.224.38.14/32` from `eks_public_access_cidrs`, and only then

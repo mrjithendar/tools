@@ -1,0 +1,56 @@
+# Mesh metrics for Kiali, which needs to query them; the prometheus-agent cannot be queried and only collects node
+# metrics. Short retention, no volume: a restart loses recent traffic graphs and nothing else.
+alertmanager:
+  enabled: false
+kube-state-metrics:
+  enabled: false
+prometheus-node-exporter:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false
+server:
+  persistentVolume:
+    enabled: false
+  retention: 6h
+  global:
+    scrape_interval: 30s
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 768Mi
+# null drops the chart's default jobs.
+scrapeConfigs: null
+serverFiles:
+  prometheus.yml:
+    rule_files: []
+    scrape_configs:
+    # Every sidecar and the gateway. Port 15090 is outside the mesh's traffic capture, so STRICT mTLS does not block it.
+    - job_name: envoy-stats
+      metrics_path: /stats/prometheus
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - source_labels:
+        - __meta_kubernetes_pod_container_port_name
+        regex: .*-envoy-prom
+        action: keep
+      - source_labels:
+        - __meta_kubernetes_namespace
+        target_label: namespace
+      - source_labels:
+        - __meta_kubernetes_pod_name
+        target_label: pod
+    - job_name: istiod
+      kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+          - istio-system
+      relabel_configs:
+      - source_labels:
+        - __meta_kubernetes_service_name
+        - __meta_kubernetes_endpoint_port_name
+        regex: istiod;http-monitoring
+        action: keep

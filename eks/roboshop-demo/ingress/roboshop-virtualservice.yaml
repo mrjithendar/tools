@@ -1,5 +1,5 @@
 # The one place /roboshop is stripped. web expects it gone: its
-# FRONTEND_BASE_PATH=/roboshop only rewrites HTML attributes. Anything else on this host has no route and gets a 404, so
+# FRONTEND_BASE_PATH=/roboshop only rewrites HTML attributes. Anything else on this host but /kiali has no route and gets a 404, so
 # this cannot capture the rest of jithendar.com, and internal services such as mcp-server have no public path at all.
 apiVersion: networking.istio.io/v1
 kind: VirtualService

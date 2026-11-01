@@ -15,6 +15,8 @@ RELEASES = {
     'metrics-server': 'kube-system',
     'prometheus-agent': 'monitoring',
     'letsencrypt-issuers': 'cert-manager',
+    'kiali': 'istio-system',
+    'kiali-prometheus': 'istio-system',
 }
 
 
@@ -60,6 +62,19 @@ def test_alb_ingress_class_is_opt_in_and_allowed_by_the_project():
     allowed = load(APPS / 'project-eks-platform.yaml')['spec']['clusterResourceWhitelist']
     assert {'group': 'networking.k8s.io', 'kind': 'IngressClass'} in allowed
     assert {'group': 'elbv2.k8s.aws', 'kind': 'IngressClassParams'} in allowed
+
+
+def test_kiali_is_read_only_behind_a_login_with_a_stable_key():
+    values = load(PLATFORM / 'kiali.yaml')
+    assert values['auth']['strategy'] == 'token'
+    assert values['deployment']['view_only_mode'] is True
+    assert values['login_token']['signing_key'].startswith('secret:')  # an empty key is regenerated on every render
+
+
+def test_kiali_route_matches_its_web_root_and_service():
+    route = load(ROOT / 'eks/roboshop-demo/ingress/kiali-virtualservice.yaml')['spec']['http'][0]
+    assert route['match'] == [{'uri': {'prefix': load(PLATFORM / 'kiali.yaml')['server']['web_root']}}]
+    assert 'rewrite' not in route
 
 
 def test_nlb_keeps_only_public_listeners_and_an_explicit_allowlist():

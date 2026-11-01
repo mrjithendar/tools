@@ -17,6 +17,7 @@ Like the mk4 Applications, they do not sync automatically and must never be sync
 | `../infrastructure/eks-ingress.tf`, `eks-roles.tf` | The AWS Load Balancer Controller's IAM role and Pod Identity | Terraform, on push to master |
 | `applications/roboshop-demo-*.yaml`, `platform/` | AWS Load Balancer Controller, Istio base, istiod, gateway and NLB Service, metrics-server, Prometheus agent, Let's Encrypt issuers, with their values | Argo CD, project `eks-platform` |
 | `roboshop-demo/ingress/` | Certificate, Gateway, VirtualService | Argo CD: `roboshop-demo-ingress` |
+| `applications/roboshop-demo-kiali*.yaml` | Kiali at `/kiali` and the small Prometheus it queries | Argo CD, project `eks-platform`; [steps](RUNBOOK.md#kiali) |
 | `roboshop-demo/mesh/` | ServiceAccounts, PeerAuthentication, AuthorizationPolicies | Argo CD: `roboshop-demo-mesh` |
 | `roboshop-ai-catalog.patch` | The change to `roboshop-ai/argocd-eks`, which owns the workloads | `git apply` in roboshop-ai ([why](#the-roboshop-ai-patch)) |
 | `diagrams/roboshop-ingress.mmd` | Editable source of the diagram below | |

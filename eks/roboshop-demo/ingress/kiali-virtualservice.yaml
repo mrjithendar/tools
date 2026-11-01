@@ -1,0 +1,21 @@
+# Kiali serves itself under /kiali (server.web_root), so nothing is rewritten. Istio matches this prefix on a path boundary,
+# and merges this with the roboshop VirtualService because they share the Gateway and host.
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: kiali
+spec:
+  hosts:
+  - jithendar.com
+  gateways:
+  - public
+  http:
+  - name: kiali
+    match:
+    - uri:
+        prefix: /kiali
+    route:
+    - destination:
+        host: kiali.istio-system.svc.cluster.local
+        port:
+          number: 20001
