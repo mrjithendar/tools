@@ -43,7 +43,7 @@ in again and see an empty history after step 10. Razorpay, SES and Turnstile val
 
 ## 2. Let's Encrypt token
 
-Create a Cloudflare API token limited to **Zone → DNS → Edit** on `jithendar.com`. It stays out of Git and Terraform state.
+Create a Cloudflare API token with **Zone → DNS → Edit** and **Zone → Zone → Read** on `jithendar.com`. It stays out of Git and Terraform state.
 
 ```bash
 read -rs CF_TOKEN
@@ -478,7 +478,7 @@ kubectl --context $EKS -n istio-ingress delete telemetry debug-access-logs
 | Browser certificate error | The gateway serves no or the wrong certificate, or a staging one. | Step 5 `openssl` command. A staging issuer never passes. |
 | Timeout connecting to the NLB | The address is not in `eks/platform/istio-ingressgateway.yaml`, or DNS is wrong. | `dig`, and the security group from step 4. |
 | TLS handshake resets at the gateway | No `Gateway` synced, or the Secret is absent, so Envoy has no 443 filter chain. | `istioctl -n istio-ingress proxy-config listeners deploy/istio-ingressgateway --port 443`, `kubectl -n istio-ingress get secret`. |
-| Certificate stuck `False` | Issuer not ready or a DNS-01 failure. | `kubectl -n istio-ingress get certificaterequest,order,challenge`, `kubectl describe challenge`. `InvalidSolver` means the Cloudflare Secret is missing. A `403` from Cloudflare means the token lacks DNS edit on this zone. |
+| Certificate stuck `False` | Issuer not ready or a DNS-01 failure. | `kubectl -n istio-ingress get certificaterequest,order,challenge`, `kubectl describe challenge`. `InvalidSolver` means the Cloudflare Secret is missing. A `403` from Cloudflare means the token lacks DNS edit or zone read on this zone. |
 | Issuer `Ready=False`, `secrets not found` | Step 2 not done. | `kubectl -n cert-manager get secret cloudflare-api-token`. |
 | Targets `unhealthy` or `initial` | Backend rule missing, or the gateway is not ready on 15021. | `kubectl -n kube-system logs deployment/aws-load-balancer-controller`. Confirm the cluster security group has the `kubernetes.io/cluster/roboshop-demo` tag and a rule from the NLB's backend group on 443 and 15021. |
 | Gateway pods stuck `Running` but not Ready | Readiness gate waiting for target health. | `kubectl -n istio-ingress get pod -o yaml \| grep -A3 readinessGates`, then the row above. |

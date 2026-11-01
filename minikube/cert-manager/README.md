@@ -93,7 +93,7 @@ Documentation: [cert-manager Helm installation](https://cert-manager.io/docs/ins
 
 The `roboshop-demo-letsencrypt-issuers` Application (`eks/applications`) installs `letsencrypt-staging` and `letsencrypt-prod` on the `roboshop-demo` EKS cluster from this chart. `jithendar.com` points at mk4 and EKS has no ingress controller, so these issuers solve DNS-01 through Cloudflare instead of HTTP-01.
 
-They need a Cloudflare API token limited to **Zone → DNS → Edit** on `jithendar.com`. Create the Secret by hand, so the token stays out of Terraform state:
+They need a Cloudflare API token with **Zone → DNS → Edit** and **Zone → Zone → Read** on `jithendar.com`. Create the Secret by hand, so the token stays out of Terraform state:
 
 ```bash
 read -rs CF_TOKEN
