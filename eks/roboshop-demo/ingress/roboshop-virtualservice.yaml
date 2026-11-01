@@ -7,6 +7,7 @@ metadata:
   name: roboshop
 spec:
   hosts:
+  - eks.jithendar.com
   - jithendar.com
   gateways:
   - public

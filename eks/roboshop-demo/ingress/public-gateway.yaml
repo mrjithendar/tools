@@ -12,6 +12,7 @@ spec:
       name: https
       protocol: HTTPS
     hosts:
+    - eks.jithendar.com
     - jithendar.com
     tls:
       mode: SIMPLE
@@ -22,6 +23,7 @@ spec:
       name: http
       protocol: HTTP
     hosts:
+    - eks.jithendar.com
     - jithendar.com
     tls:
       httpsRedirect: true
