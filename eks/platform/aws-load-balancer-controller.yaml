@@ -17,7 +17,8 @@ podDisruptionBudget:
 enableCertManager: true
 # Only a Service that asks for loadBalancerClass service.k8s.aws/nlb gets a load balancer.
 enableServiceMutatorWebhook: false
-createIngressClassResource: false
+# IngressClass "alb": an Ingress must name it, because it is not the cluster default. Each one creates a billed ALB.
+createIngressClassResource: true
 # ALB-only features; off so the controller never calls these APIs.
 enableShield: false
 enableWaf: false

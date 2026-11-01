@@ -53,6 +53,15 @@ def test_load_balancer_controller_certificate_survives_argo_renders():
     assert load(PLATFORM / 'aws-load-balancer-controller.yaml')['enableCertManager'] is True
 
 
+def test_alb_ingress_class_is_opt_in_and_allowed_by_the_project():
+    values = load(PLATFORM / 'aws-load-balancer-controller.yaml')
+    assert values['createIngressClassResource'] is True
+    assert not values.get('ingressClassConfig', {}).get('default')  # a default would give every Ingress a billed ALB
+    allowed = load(APPS / 'project-eks-platform.yaml')['spec']['clusterResourceWhitelist']
+    assert {'group': 'networking.k8s.io', 'kind': 'IngressClass'} in allowed
+    assert {'group': 'elbv2.k8s.aws', 'kind': 'IngressClassParams'} in allowed
+
+
 def test_nlb_keeps_only_public_listeners_and_an_explicit_allowlist():
     service = load(PLATFORM / 'istio-ingressgateway.yaml')['service']
     assert [p['port'] for p in service['ports']] == [443, 80]
