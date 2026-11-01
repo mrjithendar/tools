@@ -1,8 +1,8 @@
+# Pods and their logs in every namespace, for discovery in config.alloy. No Secrets or other kinds.
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   name: alloy-logs
-  namespace: traefik
 rules:
 - apiGroups:
   - ''

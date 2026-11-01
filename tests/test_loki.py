@@ -10,15 +10,18 @@ class LokiTests(unittest.TestCase):
         docs=list(yaml.safe_load_all(subprocess.check_output(['kubectl','kustomize',str(ROOT/'observability/loki')],text=True)))
         deployments=[d for d in docs if d['kind']=='Deployment']
         self.assertEqual({d['metadata']['name'] for d in deployments},{'loki','alloy'})
-        self.assertFalse(any(d['kind'] in ('Ingress','IngressRoute','ClusterRole','Secret') for d in docs))
+        self.assertFalse(any(d['kind'] in ('Ingress','IngressRoute','Role','RoleBinding','Secret') for d in docs))
         for d in deployments:
             self.assertEqual(d['spec']['replicas'],1)
             pod=d['spec']['template']['spec']
             self.assertTrue(pod['securityContext']['runAsNonRoot'])
             self.assertFalse(any('hostPath' in v for v in pod['volumes']))
-        roles=[d for d in docs if d['kind']=='Role']
-        self.assertEqual({r['metadata']['namespace'] for r in roles},{'roboshop-ai','traefik','observability'})
+        roles=[d for d in docs if d['kind']=='ClusterRole']
+        self.assertEqual([r['metadata']['name'] for r in roles],['alloy-logs'])
         self.assertTrue(all(set(rule['resources'])<={'pods','pods/log'} for r in roles for rule in r['rules']))
+        self.assertTrue(all(set(rule['verbs'])<={'get','list','watch'} for r in roles for rule in r['rules']))
+        binding=next(d for d in docs if d['kind']=='ClusterRoleBinding')
+        self.assertEqual(binding['subjects'],[{'kind':'ServiceAccount','name':'alloy','namespace':'monitoring'}])
 
     def test_retention_and_sanitization(self):
         cfg=yaml.safe_load((ROOT/'observability/loki/loki.yaml').read_text())
@@ -28,6 +31,7 @@ class LokiTests(unittest.TestCase):
         self.assertIn('stage.output { source = "safe_line" }',alloy)
         # Experimental blocks crash Alloy at its default stability level.
         self.assertNotIn('wal {',alloy)
+        self.assertNotIn('namespaces {',alloy)
         self.assertNotIn('target_label = "trace_id"',alloy)
 
     def test_datasource_preserves_prometheus(self):

@@ -13,10 +13,14 @@ spec:
     server: https://kubernetes.default.svc
   - namespace: observability
     server: https://kubernetes.default.svc
-  - namespace: roboshop-ai
-    server: https://kubernetes.default.svc
   - namespace: traefik
     server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+  # Alloy reads pods and their logs in every namespace.
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRoleBinding
   namespaceResourceWhitelist:
   - group: ''
     kind: ConfigMap
