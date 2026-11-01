@@ -1,5 +1,4 @@
-# Applies to sidecars only: the data stores run without one and are unaffected. No DestinationRule is needed, because
-# auto mTLS already picks mTLS for meshed endpoints and plaintext for the data stores.
+# Every pod in the namespace has a sidecar, data stores included. No DestinationRule is needed: auto mTLS is the default.
 apiVersion: security.istio.io/v1
 kind: PeerAuthentication
 metadata:

@@ -23,7 +23,7 @@ flowchart TD
       currency["currency-service"]
     end
 
-    subgraph data["roboshop-ai: outside the mesh"]
+    subgraph data["roboshop-ai: data stores"]
       stores[("MongoDB, Redis, PostgreSQL,<br/>RabbitMQ, Kafka")]
     end
   end
@@ -46,8 +46,8 @@ flowchart TD
   moks == mTLS ==> user
   user == mTLS ==> shipping
   mcp == mTLS ==> aigw
-  aigw -. "plaintext, password auth" .-> stores
-  user -.-> stores
-  catalogue -.-> stores
-  cart -.-> stores
-  shipping -.-> stores
+  aigw == "mTLS, password auth" ==> stores
+  user == mTLS ==> stores
+  catalogue == mTLS ==> stores
+  cart == mTLS ==> stores
+  shipping == mTLS ==> stores

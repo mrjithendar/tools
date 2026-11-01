@@ -51,6 +51,18 @@ index 269edf1..f831410 100644
 +          - op: add
 +            path: /spec/ports/0/appProtocol
 +            value: tcp
+diff --git a/argocd-eks/apps/data/mongodb.yaml b/argocd-eks/apps/data/mongodb.yaml
+index fea9a2a..609e476 100644
+--- a/argocd-eks/apps/data/mongodb.yaml
++++ b/argocd-eks/apps/data/mongodb.yaml
+@@ -18,7 +18,6 @@ spec:
+       labels:
+         app: mongodb
+         app.kubernetes.io/part-of: roboshop-ai
+-        sidecar.istio.io/inject: "false"
+         roboshop.dev/policy-exception: stateful-entrypoint
+     spec:
+       serviceAccountName: mongodb
 diff --git a/argocd-eks/cart-service.yaml b/argocd-eks/cart-service.yaml
 index c130d3d..1ca8c54 100644
 --- a/argocd-eks/cart-service.yaml
@@ -124,10 +136,10 @@ index 25025d5..95c921a 100644
 +            path: /spec/template/spec/serviceAccountName
 +            value: currency-service
 diff --git a/argocd-eks/kafka-bridge.yaml b/argocd-eks/kafka-bridge.yaml
-index 49ed7fb..be70cf0 100644
+index 49ed7fb..d7cb66b 100644
 --- a/argocd-eks/kafka-bridge.yaml
 +++ b/argocd-eks/kafka-bridge.yaml
-@@ -21,3 +21,12 @@ spec:
+@@ -21,3 +21,23 @@ spec:
      repoURL: https://github.com/mrjithendar/roboshop-ai.git
      targetRevision: master
      path: services/kafka-bridge
@@ -138,8 +150,19 @@ index 49ed7fb..be70cf0 100644
 +          name: kafka
 +        patch: |-
 +          - op: add
-+            path: /spec/template/metadata/labels/sidecar.istio.io~1inject
-+            value: "false"
++            path: /spec/template/spec/serviceAccountName
++            value: kafka
++      # Plain TCP, so the sidecar never tries to read this protocol as HTTP.
++      - target:
++          kind: Service
++          name: kafka
++        patch: |-
++          - op: add
++            path: /spec/ports/0/appProtocol
++            value: tcp
++          - op: add
++            path: /spec/ports/1/appProtocol
++            value: tcp
 diff --git a/argocd-eks/mcp-server.yaml b/argocd-eks/mcp-server.yaml
 index 0d602fc..5fb053b 100644
 --- a/argocd-eks/mcp-server.yaml
@@ -213,10 +236,10 @@ index 67990da..d277b75 100644
 +            path: /spec/template/spec/serviceAccountName
 +            value: payment-service
 diff --git a/argocd-eks/postgres.yaml b/argocd-eks/postgres.yaml
-index fdf7e59..e644065 100644
+index fdf7e59..bd07fd5 100644
 --- a/argocd-eks/postgres.yaml
 +++ b/argocd-eks/postgres.yaml
-@@ -22,3 +22,22 @@ spec:
+@@ -22,3 +22,27 @@ spec:
      repoURL: https://github.com/mrjithendar/roboshop-ai.git
      targetRevision: master
      path: services/postgres
@@ -227,23 +250,28 @@ index fdf7e59..e644065 100644
 +          name: shipping-db
 +        patch: |-
 +          - op: add
-+            path: /spec/template/metadata/labels/sidecar.istio.io~1inject
-+            value: "false"
-+      # One-shot import hook that only talks to shipping-db, which is outside the mesh.
++            path: /spec/template/spec/serviceAccountName
++            value: shipping-db
++      # Plain TCP, so the sidecar never tries to read this protocol as HTTP.
++      - target:
++          kind: Service
++          name: shipping-db
++        patch: |-
++          - op: add
++            path: /spec/ports/0/appProtocol
++            value: tcp
 +      - target:
 +          kind: Job
 +          name: shipping-location-import
 +        patch: |-
 +          - op: add
-+            path: /spec/template/metadata
-+            value:
-+              labels:
-+                sidecar.istio.io/inject: "false"
++            path: /spec/template/spec/serviceAccountName
++            value: shipping-location-import
 diff --git a/argocd-eks/rabbitmq.yaml b/argocd-eks/rabbitmq.yaml
-index cf078d6..f14baed 100644
+index cf078d6..83777bf 100644
 --- a/argocd-eks/rabbitmq.yaml
 +++ b/argocd-eks/rabbitmq.yaml
-@@ -21,3 +21,12 @@ spec:
+@@ -21,3 +21,23 @@ spec:
      repoURL: https://github.com/mrjithendar/roboshop-ai.git
      targetRevision: master
      path: services/rabbitmq
@@ -254,17 +282,28 @@ index cf078d6..f14baed 100644
 +          name: rabbitmq
 +        patch: |-
 +          - op: add
-+            path: /spec/template/metadata/labels/sidecar.istio.io~1inject
-+            value: "false"
++            path: /spec/template/spec/serviceAccountName
++            value: rabbitmq
++      # Plain TCP, so the sidecar never tries to read this protocol as HTTP.
++      - target:
++          kind: Service
++          name: rabbitmq
++        patch: |-
++          - op: add
++            path: /spec/ports/0/appProtocol
++            value: tcp
++          - op: add
++            path: /spec/ports/1/appProtocol
++            value: tcp
 diff --git a/argocd-eks/redis.yaml b/argocd-eks/redis.yaml
-index e9c63d8..c7ced17 100644
+index e9c63d8..7a69790 100644
 --- a/argocd-eks/redis.yaml
 +++ b/argocd-eks/redis.yaml
-@@ -17,9 +17,17 @@ spec:
+@@ -17,9 +17,25 @@ spec:
      - FailOnSharedResource=true
      - PruneLast=true
      - CreateNamespace=true
-+  # Stays out of the mesh; see tools/eks/README.md.
++  # Mesh identity: the ServiceAccount comes from tools/eks/roboshop-demo/mesh.
    source:
      repoURL: https://github.com/mrjithendar/roboshop-ai.git
      targetRevision: master
@@ -278,17 +317,25 @@ index e9c63d8..c7ced17 100644
 +          name: redis
 +        patch: |-
 +          - op: add
-+            path: /spec/template/metadata/labels/sidecar.istio.io~1inject
-+            value: "false"
++            path: /spec/template/spec/serviceAccountName
++            value: redis
++      # Plain TCP, so the sidecar never tries to read this protocol as HTTP.
++      - target:
++          kind: Service
++          name: redis
++        patch: |-
++          - op: add
++            path: /spec/ports/0/appProtocol
++            value: tcp
 diff --git a/argocd-eks/roboshop-config.yaml b/argocd-eks/roboshop-config.yaml
-index a0a5ce4..1e1af61 100644
+index a0a5ce4..a651ab3 100644
 --- a/argocd-eks/roboshop-config.yaml
 +++ b/argocd-eks/roboshop-config.yaml
 @@ -17,9 +17,18 @@ spec:
      - FailOnSharedResource=true
      - PruneLast=true
      - CreateNamespace=true
-+  # EKS mesh; data stores opt out per pod.
++  # EKS mesh: every workload in the namespace gets a sidecar.
    source:
      repoURL: https://github.com/mrjithendar/tools.git
      targetRevision: master

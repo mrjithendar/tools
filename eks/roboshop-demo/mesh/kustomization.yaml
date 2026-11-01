@@ -16,6 +16,11 @@ resources:
 - currency-service-serviceaccount.yaml
 - moks-serviceaccount.yaml
 - mcp-server-serviceaccount.yaml
+- redis-serviceaccount.yaml
+- rabbitmq-serviceaccount.yaml
+- shipping-db-serviceaccount.yaml
+- shipping-location-import-serviceaccount.yaml
+- kafka-serviceaccount.yaml
 - default-peerauthentication.yaml
 - allow-nothing-authorizationpolicy.yaml
 - web-authorizationpolicy.yaml
@@ -27,6 +32,11 @@ resources:
 - shipping-service-authorizationpolicy.yaml
 - currency-service-authorizationpolicy.yaml
 - moks-authorizationpolicy.yaml
+- mongodb-authorizationpolicy.yaml
+- redis-authorizationpolicy.yaml
+- rabbitmq-authorizationpolicy.yaml
+- shipping-db-authorizationpolicy.yaml
+- kafka-authorizationpolicy.yaml
 patches:
 - target:
     kind: AuthorizationPolicy

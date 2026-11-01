@@ -34,7 +34,15 @@ MATRIX = {
     'moks': (4103, {'roboshop-ai/sa/web', 'roboshop-ai/sa/ai-gateway'}),
 }
 MESHED = sorted(set(MATRIX) | {'mcp-server'})
-OUT_OF_MESH = {'redis': 'Deployment', 'rabbitmq': 'StatefulSet', 'shipping-db': 'Deployment', 'kafka': 'StatefulSet'}
+# Data stores: their ports, allowed callers, the Application and kind that deploys them.
+STORES = {
+    'mongodb': ([27017], {'roboshop-ai/sa/ai-gateway', 'roboshop-ai/sa/catalogue-service', 'roboshop-ai/sa/user-service'}),
+    'redis': ([6379], {'roboshop-ai/sa/cart-service', 'roboshop-ai/sa/shipping-service'}),
+    'rabbitmq': ([5672], {'roboshop-ai/sa/ai-gateway', 'roboshop-ai/sa/kafka', 'roboshop-ai/sa/shipping-service'}),
+    'shipping-db': ([5432], {'roboshop-ai/sa/shipping-location-import', 'roboshop-ai/sa/shipping-service'}),
+    'kafka': ([9092, 9093], {'roboshop-ai/sa/kafka'}),
+}
+STORE_APPS = {'redis': ('redis', 'Deployment'), 'rabbitmq': ('rabbitmq', 'StatefulSet'), 'shipping-db': ('postgres', 'Deployment'), 'kafka': ('kafka-bridge', 'StatefulSet')}
 
 
 def load(path):
@@ -104,7 +112,7 @@ def test_gateway_serves_the_certificate_it_is_issued():
 
 def test_authorization_matches_the_call_matrix():
     policies = {d['metadata']['name']: d for d in kustomize(MESH) if d['kind'] == 'AuthorizationPolicy'}
-    assert set(policies) == set(MATRIX) | {'allow-nothing'}
+    assert set(policies) == set(MATRIX) | set(STORES) | {'allow-nothing'}
     assert policies['allow-nothing']['spec'] == {}
     for workload, (port, callers) in MATRIX.items():
         spec = policies[workload]['spec']
@@ -112,6 +120,11 @@ def test_authorization_matches_the_call_matrix():
         rule = spec['rules'][0]
         assert {p.removeprefix('cluster.local/ns/') for p in rule['from'][0]['source']['principals']} == callers
         assert rule['to'][0]['operation'] == {'ports': [str(port)]}
+    for workload, (ports, callers) in STORES.items():
+        rule = policies[workload]['spec']['rules'][0]
+        assert policies[workload]['spec']['selector'] == {'matchLabels': {'app': workload}}
+        assert {p.removeprefix('cluster.local/ns/') for p in rule['from'][0]['source']['principals']} == callers
+        assert rule['to'][0]['operation'] == {'ports': [str(port) for port in ports]}
 
 
 def test_mcp_server_has_no_callers():
@@ -122,7 +135,7 @@ def test_mcp_server_has_no_callers():
 
 def test_every_meshed_workload_has_a_tokenless_identity():
     accounts = [d for d in kustomize(MESH) if d['kind'] == 'ServiceAccount']
-    assert sorted(d['metadata']['name'] for d in accounts) == MESHED
+    assert sorted(d['metadata']['name'] for d in accounts) == sorted({*MESHED, *STORE_APPS, 'shipping-location-import'})
     assert all(d['automountServiceAccountToken'] is False for d in accounts)
 
 
@@ -200,16 +213,26 @@ def test_catalog_runs_each_workload_as_its_own_identity(catalog, workload):
     assert 'sidecar.istio.io/inject' not in deployment['spec']['template']['metadata']['labels']
 
 
-@pytest.mark.parametrize('app,workload', [('redis', 'redis'), ('rabbitmq', 'rabbitmq'), ('postgres', 'shipping-db'), ('kafka-bridge', 'kafka')])
-def test_catalog_keeps_data_stores_out_of_the_mesh(catalog, app, workload):
+@pytest.mark.parametrize('workload', sorted(STORE_APPS))
+def test_catalog_brings_data_stores_into_the_mesh(catalog, workload):
+    app, kind = STORE_APPS[workload]
     documents = render(catalog, app)
-    pod = next(d for d in documents if d['kind'] == OUT_OF_MESH[workload] and d['metadata']['name'] == workload)
-    assert pod['spec']['template']['metadata']['labels']['sidecar.istio.io/inject'] == 'false'
+    template = next(d for d in documents if d['kind'] == kind and d['metadata']['name'] == workload)['spec']['template']
+    assert template['spec']['serviceAccountName'] == workload
+    assert 'sidecar.istio.io/inject' not in template['metadata']['labels']
+    assert STORES[workload][0][0] in [p['containerPort'] for c in template['spec']['containers'] for p in c.get('ports', [])]
+    service = next(d for d in documents if d['kind'] == 'Service' and d['metadata']['name'] == workload)
+    assert all(p['appProtocol'] == 'tcp' for p in service['spec']['ports'])
 
 
-def test_catalog_keeps_the_import_job_out_of_the_mesh(catalog):
+def test_mongodb_has_no_sidecar_opt_out(catalog):
+    assert 'sidecar.istio.io/inject' not in (catalog / 'argocd-eks/apps/data/mongodb.yaml').read_text()
+
+
+def test_catalog_puts_the_import_job_in_the_mesh(catalog):
     job = next(d for d in render(catalog, 'postgres') if d['kind'] == 'Job')
-    assert job['spec']['template']['metadata']['labels']['sidecar.istio.io/inject'] == 'false'
+    assert job['spec']['template']['spec']['serviceAccountName'] == 'shipping-location-import'
+    assert 'sidecar.istio.io/inject' not in job['spec']['template'].get('metadata', {}).get('labels', {})
 
 
 def test_catalog_declares_the_gateway_as_tcp(catalog):

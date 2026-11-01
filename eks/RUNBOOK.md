@@ -182,31 +182,34 @@ This request comes from your address, so it is in the allowed list.
 
 ## 6. Enroll the workloads
 
-Order matters. Identities first, then data stores opt out, then the namespace gets its label, then the applications restart
-into it. The mesh starts permissive with policies in dry run, so nothing can be blocked yet.
+Order matters. Identities first, then the namespace gets its label, then data stores and applications restart into it. The
+mesh starts permissive with policies in dry run, so nothing can be blocked yet. Store restarts briefly interrupt the shop; their
+data is on volumes.
 
 ```bash
 argocd app sync argocd/roboshop-demo-mesh
 kubectl --context $EKS -n roboshop-ai get serviceaccounts
-argocd app sync argocd/roboshop-demo-redis argocd/roboshop-demo-rabbitmq argocd/roboshop-demo-postgres argocd/roboshop-demo-kafka-bridge
 argocd app sync argocd/roboshop-demo-roboshop-config
 kubectl --context $EKS get namespace roboshop-ai -L istio-injection
+for app in redis rabbitmq postgres mongodb kafka-bridge; do
+  argocd app sync argocd/roboshop-demo-$app && argocd app wait argocd/roboshop-demo-$app --health --timeout 300
+done
 for app in user-service catalogue-service cart-service payment-service shipping-service currency-service moks mcp-server ai-gateway web; do
   argocd app sync argocd/roboshop-demo-$app && argocd app wait argocd/roboshop-demo-$app --health --timeout 300
 done
 ```
 
-Expected: 10 new ServiceAccounts; `ISTIO-INJECTION` is `enabled`; every sync succeeds.
+Expected: 15 ServiceAccounts from the mesh Application, plus `mongodb` and `default`; `ISTIO-INJECTION` is `enabled`; every sync succeeds.
 
 The sidecar is a native sidecar, so it is listed under init containers:
 
 ```bash
-kubectl --context $EKS -n roboshop-ai get pods -o custom-columns='POD:.metadata.name,READY:.status.containerStatuses[*].ready,SA:.spec.serviceAccountName,INIT:.spec.initContainers[*].name'
+kubectl --context $EKS -n roboshop-ai get pods -o custom-columns='POD:.metadata.name,READY:.status.containerStatuses[*].ready,SA:.spec.serviceAccountName,PROXY:.spec.initContainers[*].name'
 istioctl --context $EKS proxy-status
 ```
 
-Expected: the 10 application workloads each show `istio-proxy` and their own ServiceAccount; `mongodb`, `redis`, `rabbitmq`,
-`shipping-db` and `kafka` show no `istio-proxy`. `proxy-status` lists 10 sidecars plus 2 gateways, all `SYNCED`.
+Expected: every workload shows `istio-proxy` and its own ServiceAccount, including `mongodb`, `redis`, `rabbitmq`, `shipping-db` and
+`kafka`. `proxy-status` lists one sidecar per pod plus 2 gateways, all `SYNCED`. A store failing to come up: see Troubleshooting.
 
 ## 7. Smoke test through the NLB
 
@@ -245,19 +248,19 @@ argocd app sync argocd/roboshop-demo-mesh
 kubectl --context $EKS -n roboshop-ai get peerauthentication default
 ```
 
-Expected: `STRICT`. Repeat the step 7 curls. Sidecars then accept mesh traffic only; the data stores are unaffected.
+Expected: `STRICT`. Repeat the step 7 curls. Sidecars then accept mesh traffic only, on the data stores too.
 
 **Stage 2: review the dry run.** Turn on logging, use the shop as in step 7 including a full checkout and a Moks question, then
 read what would have been denied. Dry run is an Alpha Istio feature, so treat the result as a strong hint, and keep the fast
 rollback below ready.
 
 ```bash
-for d in web ai-gateway user-service catalogue-service cart-service payment-service shipping-service currency-service moks; do
-  istioctl --context $EKS -n roboshop-ai proxy-config log deploy/$d --level rbac:debug >/dev/null
+for d in deploy/web deploy/ai-gateway deploy/user-service deploy/catalogue-service deploy/cart-service deploy/payment-service deploy/shipping-service deploy/currency-service deploy/moks deploy/redis deploy/shipping-db sts/mongodb sts/rabbitmq; do
+  istioctl --context $EKS -n roboshop-ai proxy-config log $d --level rbac:debug >/dev/null
 done
 # ... use the shop ...
-for d in web ai-gateway user-service catalogue-service cart-service payment-service shipping-service currency-service moks; do
-  echo "== $d: $(kubectl --context $EKS -n roboshop-ai logs deploy/$d -c istio-proxy --since=30m | grep -c 'shadow denied')"
+for d in deploy/web deploy/ai-gateway deploy/user-service deploy/catalogue-service deploy/cart-service deploy/payment-service deploy/shipping-service deploy/currency-service deploy/moks deploy/redis deploy/shipping-db sts/mongodb sts/rabbitmq; do
+  echo "== $d: $(kubectl --context $EKS -n roboshop-ai logs $d -c istio-proxy --since=30m | grep -c 'shadow denied')"
 done
 ```
 
@@ -269,12 +272,12 @@ Expected: every count `0`. For a non-zero count, read the lines, and add the cal
 ```bash
 argocd app sync argocd/roboshop-demo-mesh
 kubectl --context $EKS -n roboshop-ai get authorizationpolicy -o custom-columns='NAME:.metadata.name,DRYRUN:.metadata.annotations.istio\.io/dry-run'
-for d in web ai-gateway user-service catalogue-service cart-service payment-service shipping-service currency-service moks; do
-  istioctl --context $EKS -n roboshop-ai proxy-config log deploy/$d --level rbac:warning >/dev/null
+for d in deploy/web deploy/ai-gateway deploy/user-service deploy/catalogue-service deploy/cart-service deploy/payment-service deploy/shipping-service deploy/currency-service deploy/moks deploy/redis deploy/shipping-db sts/mongodb sts/rabbitmq; do
+  istioctl --context $EKS -n roboshop-ai proxy-config log $d --level rbac:warning >/dev/null
 done
 ```
 
-Expected: 10 policies with `<none>` in `DRYRUN`. Repeat the step 7 curls and browser flow.
+Expected: 15 policies with `<none>` in `DRYRUN`. Repeat the step 7 curls and browser flow.
 
 **Fast rollback:** returns both to the safe state within seconds, then fix Git before the next sync.
 
@@ -474,6 +477,7 @@ kubectl --context $EKS -n istio-ingress delete telemetry debug-access-logs
 | `503` with `UF` or `URX`, TLS error in logs | Sidecar mismatch: a pod without a sidecar under STRICT, or passthrough to a meshed service. | `istioctl -n roboshop-ai x describe pod <pod>`. Restart pods created before the namespace label. |
 | `503`, `no healthy upstream` | web has no ready pods. | `kubectl -n roboshop-ai get pods`, then `kubectl -n roboshop-ai describe pod`. |
 | `502` or `504` on `/api/*`, and `web` not Ready | web cannot reach ai-gateway. The Service must have `appProtocol: tcp`. | `kubectl -n roboshop-ai get svc ai-gateway -o jsonpath='{.spec.ports[0].appProtocol}'`. Without it, `Host: jithendar.com` falls into passthrough and fails under STRICT. |
+| A store's clients fail with connection resets, timeouts or auth errors after STRICT | A client without a sidecar, a caller missing from the store's policy, or a store that only listens on one address. | `istioctl -n roboshop-ai x describe pod <store pod>`; the store's `istio-proxy` log with `rbac:debug`. Use the fast rollback in step 8 first. |
 | `403 RBAC: access denied`, or resets on ai-gateway | A policy is missing a legitimate caller. | `istioctl -n roboshop-ai proxy-config log deploy/<dest> --level rbac:debug` and read the log. Fix in Git, or use the fast rollback. |
 | Browser certificate error | The gateway serves no or the wrong certificate, or a staging one. | Step 5 `openssl` command. A staging issuer never passes. |
 | Timeout connecting to the NLB | The address is not in `eks/platform/istio-ingressgateway.yaml`, or DNS is wrong. | `dig`, and the security group from step 4. |

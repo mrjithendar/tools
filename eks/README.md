@@ -61,7 +61,7 @@ flowchart TD
       currency["currency-service"]
     end
 
-    subgraph data["roboshop-ai: outside the mesh"]
+    subgraph data["roboshop-ai: data stores"]
       stores[("MongoDB, Redis, PostgreSQL,<br/>RabbitMQ, Kafka")]
     end
   end
@@ -84,11 +84,11 @@ flowchart TD
   moks == mTLS ==> user
   user == mTLS ==> shipping
   mcp == mTLS ==> aigw
-  aigw -. "plaintext, password auth" .-> stores
-  user -.-> stores
-  catalogue -.-> stores
-  cart -.-> stores
-  shipping -.-> stores
+  aigw == "mTLS, password auth" ==> stores
+  user == mTLS ==> stores
+  catalogue == mTLS ==> stores
+  cart == mTLS ==> stores
+  shipping == mTLS ==> stores
 ```
 
 ## Ingress
@@ -154,8 +154,7 @@ independent. Both clusters count toward Let's Encrypt's limit of 5 duplicate cer
 | Hop | State |
 |---|---|
 | Inside a pod, sidecar to application | Plaintext on loopback, by design. |
-| Applications to MongoDB, Redis, PostgreSQL, RabbitMQ | **Plaintext** in the VPC, with password auth. These stay out of the mesh, as in `deploy/eks`: single-replica demo stores, and the images start as root. Auto mTLS sends plaintext to them, so `STRICT` does not break them. |
-| kafka-bridge to RabbitMQ, Kafka internal | **Plaintext**, same pod and stores. |
+| kafka-bridge to Kafka | Plaintext on loopback, same pod. |
 | Kubelet to pods | HTTP probes, answered by the sidecar's agent. |
 | Traces | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` names a collector that does not exist on EKS; export fails silently. |
 
@@ -178,11 +177,18 @@ Built from the service code and manifests (`USER_URL` and friends, `self.urls`, 
 | shipping-service | 4106 | ai-gateway, user-service | `self.urls`; `user-service/server.py` |
 | currency-service | 4111 | ai-gateway, web | `currency_quote.py`; `routes.conf` |
 | moks | 4103 | web, ai-gateway | `routes.conf`; `self.urls["agent"]` |
+| mongodb | 27017 | ai-gateway, catalogue-service, user-service | `MONGODB_URL` |
+| redis | 6379 | cart-service, shipping-service | `REDIS_HOST` |
+| rabbitmq | 5672 | ai-gateway, kafka, shipping-service | `RABBITMQ_URL`, `OrderEvents.java`, `bridge.py` |
+| shipping-db | 5432 | shipping-service, shipping-location-import | `SHIPPING_DATABASE_URL`, `import-locations-job.yaml` |
+| kafka | 9092, 9093 | kafka | Its own KRaft traffic; the bridge shares the pod |
 | mcp-server | 4107 | none | No in-mesh caller; use `kubectl port-forward`. `allow-nothing` denies the rest. |
 
 Each workload has its own ServiceAccount, so its identity is `spiffe://cluster.local/ns/roboshop-ai/sa/<name>`. Probes are
 rewritten by the sidecar and never pass through these policies. Application sessions, roles and service tokens stay in
 place: a policy says which workload may call, not which person.
+
+**Data stores are in the mesh.** All the stores' Services declare `appProtocol: tcp`, passwords stay in place, and the stores' traffic gets the same mTLS and identity policies as the services. RabbitMQ's management port 15672 has no allowed caller.
 
 **`ai-gateway` is declared as TCP.** NGINX forwards the browser's `Host: jithendar.com`. A sidecar treating that port as
 HTTP routes by Host, finds no such Service and sends the request through plaintext passthrough, which `STRICT` rejects. With
@@ -201,7 +207,7 @@ as `roboshop-ai-catalog.patch`, against the EKS-only layout of `services/` and `
 by argocd-eks, plus inline patches in each Application. It:
 
 - sets `serviceAccountName` on the 10 application Deployments;
-- adds `sidecar.istio.io/inject: "false"` to Redis, RabbitMQ, PostgreSQL, Kafka and the location import Job (MongoDB already has it);
+- sets `serviceAccountName` and `appProtocol: tcp` on Redis, RabbitMQ, PostgreSQL and Kafka, and removes MongoDB's sidecar opt-out;
 - declares the `ai-gateway` Service port as TCP;
 - labels the Namespace `istio-injection=enabled`, through the same Application that owns it.
 
