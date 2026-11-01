@@ -291,7 +291,7 @@ run "ingress_needs_eks" {
     error_message = "Ingress installs nothing without a cluster."
   }
 }
-run "ingress_nlb_is_https_only_and_restricted" {
+run "ingress_nlb_listeners_and_sources" {
   command = plan
   # The subnet IDs in these values are otherwise unknown at plan.
   override_resource {
@@ -306,8 +306,8 @@ run "ingress_nlb_is_https_only_and_restricted" {
     eks_ingress_source_cidrs = ["203.0.113.10/32"]
   }
   assert {
-    condition     = [for p in yamldecode(helm_release.istio_ingressgateway[0].values[0]).service.ports : p.port] == [443]
-    error_message = "Only 443 may be a listener: 15021 and metrics stay private."
+    condition     = [for p in yamldecode(helm_release.istio_ingressgateway[0].values[0]).service.ports : p.port] == [443, 80]
+    error_message = "Only 443 and 80 may be listeners: 15021 and metrics stay private."
   }
   assert {
     condition     = yamldecode(helm_release.istio_ingressgateway[0].values[0]).service.loadBalancerSourceRanges == ["203.0.113.10/32"]
@@ -326,9 +326,13 @@ run "ingress_nlb_is_https_only_and_restricted" {
     error_message = "The controller's identity must bind to its own ServiceAccount."
   }
 }
-run "ingress_rejects_open_sources" {
+run "ingress_allows_public_sources" {
   command = plan
   variables { eks_ingress_source_cidrs = ["0.0.0.0/0"] }
+}
+run "ingress_rejects_invalid_sources" {
+  command = plan
+  variables { eks_ingress_source_cidrs = ["jithendar.com"] }
   expect_failures = [var.eks_ingress_source_cidrs]
 }
 run "ingress_requires_sources" {

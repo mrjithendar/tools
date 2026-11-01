@@ -35,8 +35,10 @@ NLB would take the whole website with it.
 This repository controls Traefik, so the path routing stays there and only `/roboshop` moves. That differs from the
 default `Browser → NLB` in one way: **the browser's TLS session ends at Traefik on mk4**, and Traefik opens a second,
 verified TLS session to the Istio gateway through the NLB. Only the two addresses in `eks_ingress_source_cidrs` can reach
-the NLB. If the apex ever moves to AWS, the browser would reach the NLB directly and nothing in EKS changes, but the
-website needs a new home first, and `eks_ingress_source_cidrs` and port 80 would need revisiting.
+the NLB.
+
+This path is temporary, because mk4 will be deleted. The NLB already listens on 443 and 80, and `eks_ingress_source_cidrs`
+accepts `0.0.0.0/0`. Everything else that lives on mk4 has to move first: see [Retiring mk4](RUNBOOK.md#retiring-mk4).
 
 The only external change is one DNS record for a **hostname**: `roboshop-origin.jithendar.com`, a DNS-only CNAME to the NLB.
 It keeps the generated load balancer name out of Git. The apex and `www` records are not touched.

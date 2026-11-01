@@ -130,8 +130,8 @@ SG=$(aws elbv2 describe-load-balancers --load-balancer-arns "$NLB_ARN" --query '
 aws ec2 describe-security-groups --group-ids $SG --query 'SecurityGroups[].IpPermissions[].[FromPort,IpRanges[].CidrIp]' --output json
 ```
 
-Expected: `internet-facing active network`; one listener, `443 TCP`; two `healthy` targets; the frontend group allows 443
-from exactly your two CIDRs. No `15021`, no `80`, no `0.0.0.0/0`.
+Expected: `internet-facing active network`; two listeners, `443 TCP` and `80 TCP`; two `healthy` targets per listener; the
+frontend group allows 443 and 80 from exactly your two CIDRs. No `15021`, no `0.0.0.0/0` until [Retiring mk4](#retiring-mk4).
 
 ## 5. Certificate and gateway
 
@@ -344,6 +344,41 @@ Expected: `308 https://jithendar.com/roboshop/?utm=x`; `HTTP/2 200` with `server
 without the `/etc/hosts` line.
 
 A `200` here also proves Traefik verified the gateway's certificate. Keep the mk4 RoboShop running until you are satisfied.
+
+## Retiring mk4
+
+Browsers then reach the NLB directly, with nothing in front of it. **Do not start until steps 8 and 9 pass.** The DNS change
+moves every path on the hostname, and today's `roboshop` VirtualService answers `404` for everything except `/roboshop`.
+
+Everything below runs on mk4 and needs a new home first:
+
+| What | Where it is now | What depends on it |
+|---|---|---|
+| Next.js website | `jithendar.com/`, `www.jithendar.com` | The apex record; `www` also needs adding to the Gateway and Certificate |
+| Argo CD | `/argocd` | It is the hub that deploys `roboshop-demo` to EKS |
+| Prometheus, Grafana | `/prometheus`, `/grafana` | `eks_prometheus_remote_write_url` |
+| Moks portal | `/moks` paths | Its own Argo application and schema |
+
+Then open the NLB. In `infrastructure/vars/terraform.tfvars` set:
+
+```hcl
+eks_ingress_source_cidrs = ["0.0.0.0/0"]
+```
+
+Commit and push, then check it from an address outside the old list:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' --resolve jithendar.com:443:$NLB_IP https://jithendar.com/roboshop/
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' --resolve jithendar.com:80:$NLB_IP http://jithendar.com/roboshop/
+```
+
+Expected: `200`, then `301 https://jithendar.com/roboshop/`.
+
+In Cloudflare, change the `jithendar.com` record to a **DNS only** CNAME for `$NLB_HOST`; Cloudflare flattens it at the apex.
+This is the moment mk4 stops taking public traffic. Roll back by restoring the `46.224.38.14` A record.
+
+Once the site has been stable long enough to trust: remove `46.224.38.14/32` from `eks_public_access_cidrs`, delete
+`roboshop-demo-edge` and the `roboshop-origin` record, and only then delete mk4.
 
 ## Rollback
 

@@ -145,11 +145,14 @@ resource "helm_release" "istio_ingressgateway" {
       type                          = "LoadBalancer"
       loadBalancerClass             = "service.k8s.aws/nlb"
       allocateLoadBalancerNodePorts = false # IP targets reach the pods directly
-      # Becomes the NLB's frontend security group. Without it the NLB is open to the Internet.
+      # Becomes the NLB's frontend security group; 0.0.0.0/0 here is what makes the site public without mk4.
       loadBalancerSourceRanges = var.eks_ingress_source_cidrs
-      # HTTPS only: only Service ports become listeners, so the 15021 status port stays private and is used solely by
-      # the health check. HTTP to HTTPS redirects stay on the edge in front of this NLB (minikube/roboshop).
-      ports = [{ name = "https", port = 443, protocol = "TCP", targetPort = 443 }]
+      # Only Service ports become listeners, so the 15021 status port stays private and is used solely by the health
+      # check. Port 80 only redirects to HTTPS, through the Gateway in eks/roboshop-demo/ingress.
+      ports = [
+        { name = "https", port = 443, protocol = "TCP", targetPort = 443 },
+        { name = "http", port = 80, protocol = "TCP", targetPort = 80 },
+      ]
       annotations = {
         "service.beta.kubernetes.io/aws-load-balancer-name"            = "${local.eks_name}-ingress"
         "service.beta.kubernetes.io/aws-load-balancer-scheme"          = "internet-facing"

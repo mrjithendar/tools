@@ -256,11 +256,11 @@ variable "eks_ingress_enabled" {
 }
 
 variable "eks_ingress_source_cidrs" {
-  description = "IPv4 CIDRs allowed to reach the NLB on 443. Required with eks_ingress_enabled; mk4's edge and admin addresses, not the Internet."
+  description = "IPv4 CIDRs allowed to reach the NLB on 443 and 80. Required with eks_ingress_enabled; 0.0.0.0/0 serves the Internet directly (eks/RUNBOOK.md, Retiring mk4)."
   type        = list(string)
   default     = []
   validation {
-    condition     = alltrue([for c in var.eks_ingress_source_cidrs : can(cidrnetmask(c)) && !endswith(c, "/0")])
-    error_message = "Use restricted IPv4 CIDRs: the public path reaches the NLB through the edge on mk4."
+    condition     = alltrue([for c in var.eks_ingress_source_cidrs : can(cidrnetmask(c))])
+    error_message = "Use IPv4 CIDRs."
   }
 }

@@ -34,7 +34,7 @@ eks_cloudwatch_observability_enabled = false
 
 eks_letsencrypt_dns_zone = "jithendar.com"
 
-# Keep false until eks/RUNBOOK.md step 4. True installs the load balancer controller and Istio and creates a billed NLB
-# as soon as it reaches master. Addresses allowed to reach it: mk4's edge, home IP.
-eks_ingress_enabled      = false
+# Installs the load balancer controller and Istio and creates a billed NLB (eks/RUNBOOK.md step 4).
+# Addresses allowed to reach it: mk4's edge, home IP. Becomes 0.0.0.0/0 at eks/RUNBOOK.md, Retiring mk4.
+eks_ingress_enabled      = true
 eks_ingress_source_cidrs = ["46.224.38.14/32", "122.177.247.138/32"]
