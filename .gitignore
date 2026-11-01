@@ -18,3 +18,7 @@ artifacts/
 .secrets
 
 cloudflare-secrets.yaml
+
+# Filled-in Secrets for deploy/; templates stay in deploy/*/examples as *.yaml.example.
+deploy/**/*-secret.yaml
+deploy/**/*-secrets.yaml

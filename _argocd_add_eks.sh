@@ -28,5 +28,5 @@ kubectl --context mk4 -n velero get role,rolebinding -o name | grep moks
 
 ######################## DEPLOY ARGOCD APPS##########################
 EKS=roboshop-demo; MK4=mk4
-kubectl --context $MK4 apply -f eks-argocd/applications/
+kubectl --context $MK4 apply -f deploy/eks/applications/
 kubectl --context $MK4 -n argocd get applications | grep roboshop-demo

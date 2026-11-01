@@ -18,7 +18,7 @@ ARGOCD_CHART_VERSION = '10.10.5'
 
 
 def catalog():
-    """Applications and AppProjects from the mk4 catalog (tools/minikube-argocd)."""
+    """Applications and AppProjects from the mk4 catalog (tools/deploy/minikube/applications)."""
     docs = []
     for directory in CATALOGS:
         resources = yaml.safe_load((directory / 'kustomization.yaml').read_text())['resources']
@@ -71,7 +71,7 @@ def main():
     if 'cert-manager' in args.apps:
         apps['cert-manager'] = yaml.safe_load((MONITORING_ARGOCD / 'cert-manager.yaml').read_text())
     if args.apps == ['list']:
-        print('all: every Application registered in tools/minikube-argocd')
+        print('all: every Application registered in tools/deploy/minikube/applications')
         print('Available apps: ' + ' '.join(sorted(apps)))
         return
     if args.timeout <= 0:
@@ -128,7 +128,7 @@ def main():
                 'install', 'argocd', 'argo-cd',
                 '--repo', 'https://argoproj.github.io/argo-helm',
                 '--version', ARGOCD_CHART_VERSION, '--create-namespace',
-                '--values', str(ROOT / 'minikube/argocd/values.yaml'),
+                '--values', str(ROOT / 'deploy/minikube/argocd/values.yaml'),
                 '--wait', '--timeout', f'{args.timeout}s'])
         for crd in ('applications.argoproj.io', 'appprojects.argoproj.io'):
             run('wait', '--for=condition=Established', f'crd/{crd}', f'--timeout={args.timeout}s')
@@ -169,7 +169,7 @@ def main():
         if destination.get('server') != 'https://kubernetes.default.svc':
             raise RuntimeError(f'{name}: remote destination requires namespace setup on its own cluster')
         namespace = destination['namespace']
-        manifest = ROOT / 'minikube/namespaces' / f'{namespace}.yaml'
+        manifest = ROOT / 'deploy/minikube/namespaces' / f'{namespace}.yaml'
         if not manifest.is_file() or yaml.safe_load(manifest.read_text()) != {
                 'apiVersion': 'v1', 'kind': 'Namespace', 'metadata': {'name': namespace}}:
             raise RuntimeError(f'{name}: missing or invalid namespace manifest for {namespace}')
@@ -210,7 +210,7 @@ def main():
                 # An empty desired state compared with an empty cluster also reads
                 # Synced/Healthy; that hides a source that matches no manifests.
                 if not status.get('resources'):
-                    raise RuntimeError(f'{name}: synced but tracks no resources; check its source path/include in argocd/{name}.yaml')
+                    raise RuntimeError(f'{name}: synced but tracks no resources; check its source path/include in deploy/minikube/applications/{name}.yaml')
                 print(f'{name}: Synced / Healthy', flush=True)
                 pending.remove(name)
         if pending:

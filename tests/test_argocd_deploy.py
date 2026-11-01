@@ -60,7 +60,7 @@ def test_stale_live_source_aligned_with_git_before_sync():
     # A pre-split include renders nothing; a prune sync would delete everything.
     git = deploy.catalog()[0]['loki']
     stale = json.loads(json.dumps(git))
-    stale['spec']['source']['path'] = 'observability/retired'
+    stale['spec']['source']['path'] = 'deploy/minikube/observability/retired'
     stale['spec']['sources'] = [{'repoURL': 'https://example.invalid'}]
     responses = ['crd', 'crd', json.dumps({'items': [stale]}), 'appproject/mk-platform',
                  'patched', 'patched', json.dumps({'items': [healthy(git)]})]
@@ -83,7 +83,7 @@ def test_destination_moves_are_aligned_and_use_git_namespace():
     with patch('sys.argv', ['deploy', 'prometheus']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run, \
             patch.object(deploy.subprocess, 'check_call') as apply:
         deploy.main()
-    assert apply.call_args.args[0][-1].endswith('/minikube/namespaces/monitoring.yaml')
+    assert apply.call_args.args[0][-1].endswith('/deploy/minikube/namespaces/monitoring.yaml')
     ops = json.loads(next(c for c in run.call_args_list if '--type=json' in c.args[0]).kwargs['input'])
     assert ops == [{'op': 'add', 'path': '/spec/destination', 'value': git['spec']['destination']}]
 
@@ -120,7 +120,7 @@ def test_synced_app_tracking_no_resources_fails():
 def test_status_warns_about_drift_and_empty_apps(capsys):
     git = deploy.catalog()[0]['loki']
     stale = json.loads(json.dumps(git))
-    stale['spec']['source']['path'] = 'observability/retired'
+    stale['spec']['source']['path'] = 'deploy/minikube/observability/retired'
     good = healthy(deploy.catalog()[0]['grafana'])
     with patch('sys.argv', ['deploy', 'status']), patch.object(deploy.subprocess, 'check_output',
             side_effect=['crd', 'crd', 'NAME SYNC\n', json.dumps({'items': [stale, good]})]) as run:
@@ -168,7 +168,7 @@ def test_fresh_install_uses_pinned_chart_and_absolute_values():
     command=write.call_args.args[0]
     assert 'fresh' in command
     assert deploy.ARGOCD_CHART_VERSION in command
-    assert str(deploy.ROOT / 'minikube/argocd/values.yaml') in command
+    assert str(deploy.ROOT / 'deploy/minikube/argocd/values.yaml') in command
     assert '--wait' in command
     assert command[command.index('--repo') + 1] == 'https://argoproj.github.io/argo-helm'
     assert not any(arg.startswith('oci://') for arg in command)
@@ -277,7 +277,7 @@ def test_namespace_applied_before_sync_and_deduplicated():
         deploy.main()
     applies = [c for c in events if 'apply' in c]
     assert len(applies) == 1
-    assert applies[0][-1].endswith('/minikube/namespaces/monitoring.yaml')
+    assert applies[0][-1].endswith('/deploy/minikube/namespaces/monitoring.yaml')
     assert '--server-side' in applies[0]
     assert events.index(applies[0]) < next(i for i,c in enumerate(events) if 'patch' in c)
 
@@ -285,5 +285,5 @@ def test_namespace_applied_before_sync_and_deduplicated():
 def test_all_catalog_destinations_have_namespace_manifests():
     for app in deploy.catalog()[0].values():
         namespace = app['spec']['destination']['namespace']
-        doc = deploy.yaml.safe_load((deploy.ROOT / 'minikube/namespaces' / f'{namespace}.yaml').read_text())
+        doc = deploy.yaml.safe_load((deploy.ROOT / 'deploy/minikube/namespaces' / f'{namespace}.yaml').read_text())
         assert doc == {'apiVersion':'v1', 'kind':'Namespace', 'metadata':{'name':namespace}}

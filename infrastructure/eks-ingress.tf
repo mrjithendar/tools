@@ -1,5 +1,5 @@
 # IAM for the AWS Load Balancer Controller, opt-in because the NLB it creates is billed. The controller, Istio and the
-# gateway are Argo CD Applications in eks-argocd/applications; eks-argocd/RUNBOOK.md gives the order.
+# gateway are Argo CD Applications in deploy/eks/applications; deploy/eks/RUNBOOK.md gives the order.
 resource "aws_iam_policy" "eks_load_balancer_controller" {
   count  = local.eks_ingress_enabled ? 1 : 0
   name   = "${local.eks_name}-load-balancer-controller"

@@ -19,7 +19,7 @@ def test_ecr_credentials_stdin_only_and_namespaces(capsys):
     with patch.dict(module.os.environ, {}, clear=True), patch.object(module.subprocess, 'run', side_effect=run), patch.object(module.subprocess, 'check_call'):
         module.refresh_pull_secrets('test-context')
     secrets = [json.loads(k['input']) for c,k in calls if 'input' in k and json.loads(k['input'])['kind'] == 'Secret']
-    expected = {p.stem for p in (module.ROOT/'minikube/namespaces').glob('*.yaml')} - {'kube-system'}
+    expected = {p.stem for p in (module.ROOT/'deploy/minikube/namespaces').glob('*.yaml')} - {'kube-system'}
     assert {d['metadata']['namespace'] for d in secrets} == expected
     for secret in secrets:
         config = json.loads(base64.b64decode(secret['data']['.dockerconfigjson']))

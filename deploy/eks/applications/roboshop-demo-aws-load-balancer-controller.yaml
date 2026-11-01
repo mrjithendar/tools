@@ -1,0 +1,32 @@
+# Reconciles the gateway Service into the NLB. Its IAM role and Pod Identity stay in infrastructure/eks-ingress.tf; keep policies/ on this chart tag.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: roboshop-demo-aws-load-balancer-controller
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: roboshop-gitops
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  project: eks-platform
+  destination:
+    name: roboshop-demo
+    namespace: kube-system
+  syncPolicy:
+    syncOptions:
+    - FailOnSharedResource=true
+    - PruneLast=true
+    - CreateNamespace=true
+    - ServerSideApply=true
+  sources:
+  - repoURL: https://aws.github.io/eks-charts
+    chart: aws-load-balancer-controller
+    targetRevision: 3.6.2
+    helm:
+      releaseName: aws-load-balancer-controller
+      valueFiles:
+      - $values/deploy/eks/helm-values/aws-load-balancer-controller.yaml
+  - repoURL: https://github.com/mrjithendar/tools.git
+    targetRevision: master
+    ref: values

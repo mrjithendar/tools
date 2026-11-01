@@ -17,11 +17,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts/lib'))
 from repos import APP  # noqa: E402
 
-EKS = ROOT / 'eks-argocd'
-INGRESS = EKS / 'roboshop-demo/ingress'
+EKS = ROOT / 'deploy/eks'
+INGRESS = EKS / 'manifests/ingress'
 MESH = APP / 'argocd-eks/apps/mesh'
 GATEWAY = 'istio-ingress/sa/istio-ingressgateway'
-# Every in-mesh call, read from the service code and env (eks-argocd/README.md). Workload -> port, allowed callers.
+# Every in-mesh call, read from the service code and env (deploy/eks/README.md). Workload -> port, allowed callers.
 MATRIX = {
     'web': (8080, {GATEWAY}),
     'ai-gateway': (3000, {'roboshop-ai/sa/web', 'roboshop-ai/sa/moks', 'roboshop-ai/sa/mcp-server'}),

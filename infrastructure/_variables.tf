@@ -234,7 +234,7 @@ variable "eks_cloudwatch_observability_enabled" {
 }
 
 variable "eks_ingress_enabled" {
-  description = "Create the IAM role and Pod Identity of the AWS Load Balancer Controller, which Argo CD installs. Follow eks-argocd/RUNBOOK.md."
+  description = "Create the IAM role and Pod Identity of the AWS Load Balancer Controller, which Argo CD installs. Follow deploy/eks/RUNBOOK.md."
   type        = bool
   default     = false
 }

@@ -7,7 +7,7 @@ import pytest
 import yaml
 
 ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location('refresh_job',ROOT/'minikube/ecr-refresh/refresh.py')
+spec=importlib.util.spec_from_file_location('refresh_job',ROOT/'deploy/minikube/ecr-refresh/refresh.py')
 module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 TOKEN=base64.b64encode(b'AWS:private-password').decode()
 
@@ -41,7 +41,7 @@ def test_invalid_token_never_contacts_kubernetes():
 
 
 def test_schedule_rbac_and_public_images():
-    docs=[yaml.safe_load(p.read_text()) for p in (ROOT/'minikube/ecr-refresh').glob('*.yaml') if p.name != 'kustomization.yaml']
+    docs=[yaml.safe_load(p.read_text()) for p in (ROOT/'deploy/minikube/ecr-refresh').glob('*.yaml') if p.name != 'kustomization.yaml']
     cron=next(d for d in docs if d['kind']=='CronJob')['spec']
     assert cron['schedule']=='0 */6 * * *' and cron['concurrencyPolicy']=='Forbid'
     assert cron['jobTemplate']['spec']['activeDeadlineSeconds']==300

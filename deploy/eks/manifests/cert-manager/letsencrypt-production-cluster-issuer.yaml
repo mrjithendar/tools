@@ -1,0 +1,21 @@
+# Trusted certificates for the gateway. The domain does not always point at this cluster, so this solves DNS-01 through
+# Cloudflare, not HTTP-01. Prerequisite: Secret cloudflare-api-token in cert-manager (deploy/eks/examples).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: jithendardharmapuri@gmail.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+    - selector:
+        dnsZones:
+        - jithendar.com
+      dns01:
+        cloudflare:
+          apiTokenSecretRef:
+            name: cloudflare-api-token
+            key: api-token

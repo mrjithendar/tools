@@ -1,0 +1,22 @@
+auth:
+  strategy: token # sign in with a ServiceAccount token: this is on a public path
+deployment:
+  view_only_mode: true # the UI can read the mesh but never change it
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 512Mi
+external_services:
+  prometheus:
+    url: http://kiali-prometheus-server.istio-system
+  grafana:
+    enabled: false
+  tracing:
+    enabled: false
+login_token:
+  # A Secret created by hand (deploy/eks/RUNBOOK.md, Kiali). Left empty, the chart generates a new key on every Argo CD render.
+  signing_key: secret:kiali-signing-key:key
+server:
+  web_root: /kiali

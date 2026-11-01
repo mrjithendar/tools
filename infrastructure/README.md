@@ -150,15 +150,15 @@ this code review.
 
 ## EKS
 
-EKS is not part of this stack. See [`deploy/eks`](../deploy/eks/README.md) for the VPC, cluster,
+EKS is not part of this stack. See the separate `deploy/eks` stack in roboshop-ai (not this repository's [deploy/eks](../deploy/eks/README.md), which holds Kubernetes manifests) for the VPC, cluster,
 add-ons, Karpenter, Istio, Gatekeeper, KEDA, observability and Argo CD, with its own state.
 That stack creates its own VPC; nothing here is reused except, optionally, these ECR
 repositories.
 
 This stack holds what lives in AWS. Controllers on the `roboshop-demo` cluster are Argo CD Applications in
-[eks-argocd/applications](../eks-argocd/applications), not Helm releases here. `eks_ingress_enabled = true` adds only the AWS Load Balancer
-Controller's IAM role and Pod Identity ([`eks-ingress.tf`](eks-ingress.tf), design in [eks-argocd/README.md](../eks-argocd/README.md)). Follow
-[eks-argocd/RUNBOOK.md](../eks-argocd/RUNBOOK.md).
+[deploy/eks/applications](../deploy/eks/applications), not Helm releases here. `eks_ingress_enabled = true` adds only the AWS Load Balancer
+Controller's IAM role and Pod Identity ([`eks-ingress.tf`](eks-ingress.tf), design in [deploy/eks/README.md](../deploy/eks/README.md)). Follow
+[deploy/eks/RUNBOOK.md](../deploy/eks/RUNBOOK.md).
 `policies/` holds the upstream controller IAM policy for the pinned version; replace it when the chart moves.
 
 ## Amazon SES transactional email

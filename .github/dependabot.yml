@@ -5,9 +5,9 @@
 # Minor and patch updates are grouped to keep the PR count down; majors arrive one PR each.
 # Security updates are not grouped and are not held back by the cooldown.
 #
-# Not covered, because Dependabot cannot read them; bump these by hand: Helm chart versions in minikube-argocd/*.yaml,
-# scripts/argocd/ and minikube/deploy-*.sh, the host tools in scripts/setup/versions.json, terraform_version
-# in the workflows, and the Vault image (minikube/vault/values.yaml has no Chart.yaml, and
+# Not covered, because Dependabot cannot read them; bump these by hand: Helm chart versions in deploy/minikube/applications/*.yaml,
+# scripts/argocd/ and deploy/minikube/deploy-*.sh, the host tools in scripts/setup/versions.json, terraform_version
+# in the workflows, and the Vault image (deploy/minikube/vault/values.yaml has no Chart.yaml, and
 # tests/test_vault_chart.py pins it).
 
 version: 2
@@ -26,12 +26,12 @@ updates:
     commit-message:
       prefix: "deps(terraform)"
 
-  # Images in the Kubernetes manifests. observability/jaeger and observability/otel-collector are left
+  # Images in the Kubernetes manifests. deploy/minikube/observability/jaeger and deploy/minikube/observability/otel-collector are left
   # out: no Argo CD Application deploys them.
   - package-ecosystem: docker
     directories:
-      - /minikube/ecr-refresh
-      - /observability/loki
+      - /deploy/minikube/ecr-refresh
+      - /deploy/minikube/observability/loki
     schedule:
       interval: weekly
       day: monday
@@ -51,7 +51,7 @@ updates:
 
   # Images in the local Prometheus chart values (prometheus, busybox)
   - package-ecosystem: helm
-    directory: /observability/prometheus
+    directory: /deploy/minikube/observability/prometheus
     schedule:
       interval: weekly
       day: monday

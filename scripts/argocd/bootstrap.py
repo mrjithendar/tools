@@ -36,7 +36,7 @@ def refresh_pull_secrets(context):
     kube = ['kubectl', '--context', context, '--request-timeout=20s']
     # Explicit repository-managed namespaces only; never modify kube-system or
     # unrelated namespaces. Kubernetes has no cluster-scoped imagePullSecret.
-    for path in sorted((ROOT / 'minikube/namespaces').glob('*.yaml')):
+    for path in sorted((ROOT / 'deploy/minikube/namespaces').glob('*.yaml')):
         namespace = path.stem
         if namespace == 'kube-system':
             continue
@@ -147,7 +147,7 @@ def main():
             raise RuntimeError(f'{tool} is required')
     refresh_pull_secrets(args.context)
     if args.schedule_pull_secrets:
-        rendered = subprocess.check_output(['kubectl', 'kustomize', str(ROOT / 'minikube/ecr-refresh')], text=True)
+        rendered = subprocess.check_output(['kubectl', 'kustomize', str(ROOT / 'deploy/minikube/ecr-refresh')], text=True)
         docs = list(yaml.safe_load_all(rendered))
         for doc in docs:
             if doc.get('kind') == 'CronJob':
@@ -192,14 +192,14 @@ def main():
             if read('get', *marker, '--ignore-not-found', '-o', 'name').strip():
                 raise RuntimeError(f'{name}: existing resources without the expected Helm release; refusing adoption.')
             subprocess.check_call(helm + ['install', name, name, '--repo', repo, '--version', version,
-                '--create-namespace', '--values', str(ROOT / 'minikube' / name / 'values.yaml'),
+                '--create-namespace', '--values', str(ROOT / 'deploy/minikube' / name / 'values.yaml'),
                 '--wait', '--timeout', f'{args.timeout}s'])
         deployments = ['cert-manager', 'cert-manager-webhook', 'cert-manager-cainjector'] if name == 'cert-manager' else ['traefik']
         for deployment in deployments:
             subprocess.check_call(kube + ['-n', namespace, 'rollout', 'status', f'deployment/{deployment}', f'--timeout={args.timeout}s'])
     # Reuse the existing pinned, Helm-version-compatible Argo installer.
     subprocess.check_call([sys.executable, str(ROOT / 'scripts/argocd/deploy.py'), 'install', '--context', args.context, '--timeout', str(args.timeout)])
-    subprocess.check_call(kube + ['apply', '-k', str(ROOT / 'minikube/argocd')])
+    subprocess.check_call(kube + ['apply', '-k', str(ROOT / 'deploy/minikube/argocd')])
     print('Controllers and Argo CD ingress ready. Public HTTPS still requires host ports 80/443 and the shared certificate.')
     if args.deploy_apps:
         subprocess.check_call([sys.executable, str(ROOT / 'scripts/argocd/deploy.py'), '--context', args.context, '--timeout', str(args.timeout)])

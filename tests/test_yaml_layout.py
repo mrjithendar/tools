@@ -13,7 +13,7 @@ APP = checkout(APP_REPO)  # roboshop-ai: microservices and their manifests
 
 def active_yaml():
     # Do not rewrite historical upstream source or installed dependencies.
-    bases=[ARGOCD,ROOT/'eks-argocd',ROOT/'minikube',ROOT/'observability',APP/'services',APP/'tests/load',APP/'.github']
+    bases=[ARGOCD,ROOT/'deploy/eks',ROOT/'deploy/minikube',APP/'services',APP/'tests/load',APP/'.github']
     for base in bases:
         assert base.is_dir(),base
         for p in base.rglob('*'):
@@ -33,14 +33,14 @@ def test_each_active_yaml_is_one_document():
 
 
 def test_each_local_chart_template_renders_at_most_one_resource():
-    for chart in ('observability/prometheus','minikube/cert-manager/issuers'):
+    for chart in ('deploy/minikube/observability/prometheus','deploy/minikube/cert-manager/issuers'):
         output=subprocess.check_output(['helm','template','layout',str(ROOT/chart),'-n','layout'],text=True)
         sources=re.findall(r'^# Source: (.+)$',output,re.M)
         assert len(sources)==len(set(sources)),chart
 
 
 def test_local_kustomize_references_exist():
-    for base in (ROOT/'eks-argocd',ROOT/'minikube',APP/'services',ROOT/'observability'):
+    for base in (ROOT/'deploy/minikube',APP/'services'):
         for path in base.rglob('kustomization.yaml'):
             if any(x in path.parts for x in ('node_modules','.venv')):continue
             for resource in yaml.safe_load(path.read_text()).get('resources',[]):

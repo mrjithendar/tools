@@ -1,0 +1,128 @@
+# Pinned grafana-community chart; TLS terminates at Traefik.
+fullnameOverride: grafana
+replicas: 1
+deploymentStrategy:
+  type: Recreate
+service:
+  type: ClusterIP
+  port: 80
+persistence:
+  enabled: true
+  size: 2Gi
+  accessModes: [ReadWriteOnce]
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+# Shared with Prometheus's Traefik BasicAuth middleware; created by credentials.py.
+admin:
+  existingSecret: monitoring-auth
+  userKey: username
+  passwordKey: password
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.tls: "true"
+  hosts: [jithendar.com]
+  path: /grafana
+  pathType: Prefix
+  tls:
+    - hosts: [jithendar.com]
+# Do not strip /grafana at the ingress: Grafana handles the prefix itself.
+grafana.ini:
+  server:
+    domain: jithendar.com
+    root_url: https://jithendar.com/grafana/
+    serve_from_sub_path: true
+    protocol: http
+  security:
+    cookie_secure: true
+    cookie_samesite: lax
+  users:
+    allow_sign_up: false
+  auth.anonymous:
+    enabled: false
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+readinessProbe:
+  httpGet:
+    path: /grafana/api/health
+    port: grafana
+livenessProbe:
+  httpGet:
+    path: /grafana/api/health
+    port: grafana
+
+# Grafana queries Prometheus inside the cluster; ingress authentication is external only.
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: roboshop-prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.monitoring.svc.cluster.local:9090/prometheus
+        isDefault: true
+        editable: false
+        jsonData:
+          httpMethod: POST
+          timeInterval: 30s
+      - name: Loki
+        uid: roboshop-loki
+        type: loki
+        access: proxy
+        url: http://loki.monitoring.svc:3100
+        isDefault: false
+        editable: false
+        jsonData:
+          maxLines: 1000
+          # Log lines carry trace_id=<32 hex>; the link opens it in Jaeger's UI, which is not exposed publicly:
+          # kubectl -n observability port-forward svc/jaeger 16686 first. (Jaeger 2.x has no legacy /api/*,
+          # which Grafana's Jaeger data source needs, so there is no Jaeger data source.)
+          derivedFields:
+            - name: TraceID
+              matcherRegex: "trace_id=([0-9a-f]{32})"
+              url: "http://localhost:16686/trace/$${__value.raw}"  # $$ escapes Grafana's env-var expansion
+              urlDisplayLabel: "Open trace in Jaeger (port-forward)"
+
+# RoboShop dashboards live in deploy/minikube/observability/grafana/dashboards and arrive as the
+# grafana-dashboards-roboshop ConfigMap (third source of the grafana Application).
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: roboshop
+        orgId: 1
+        folder: RoboShop
+        type: file
+        disableDeletion: true
+        editable: false
+        allowUiUpdates: false
+        updateIntervalSeconds: 30
+        options:
+          path: /var/lib/grafana/dashboards/roboshop
+      - name: jithendar
+        orgId: 1
+        folder: Jithendar.com
+        type: file
+        disableDeletion: true
+        editable: false
+        allowUiUpdates: false
+        updateIntervalSeconds: 30
+        options:
+          path: /var/lib/grafana/dashboards/jithendar
+dashboardsConfigMaps:
+  roboshop: grafana-dashboards-roboshop
+  jithendar: grafana-dashboards-jithendar
+
+# Minikube hostPath data lives on this node; move only together with the data.
+nodeSelector:
+  kubernetes.io/hostname: mk4-m04

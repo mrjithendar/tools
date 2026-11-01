@@ -1,0 +1,31 @@
+# Backs kubectl top and the Horizontal Pod Autoscaler.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: roboshop-demo-metrics-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: roboshop-gitops
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  project: eks-platform
+  destination:
+    name: roboshop-demo
+    namespace: kube-system
+  syncPolicy:
+    syncOptions:
+    - FailOnSharedResource=true
+    - PruneLast=true
+    - CreateNamespace=true
+  sources:
+  - repoURL: https://kubernetes-sigs.github.io/metrics-server/
+    chart: metrics-server
+    targetRevision: 3.14.0
+    helm:
+      releaseName: metrics-server
+      valueFiles:
+      - $values/deploy/eks/helm-values/metrics-server.yaml
+  - repoURL: https://github.com/mrjithendar/tools.git
+    targetRevision: master
+    ref: values

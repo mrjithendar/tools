@@ -18,7 +18,7 @@ def test_catalog_has_unique_safe_ownership():
     assert not {'moks','catalogue-service','web'} & names
     assert not {'shopping-agent','product-ingestion','jfrog'} & names
     assert not {'argocd','traefik','coredns','kube-proxy','kindnet'}&names
-    assert len(apps)==4  # tools/minikube-argocd; RoboShop is on EKS (roboshop-ai/argocd-eks)
+    assert len(apps)==4  # tools/deploy/minikube/applications; RoboShop is on EKS (roboshop-ai/argocd-eks)
     assert 'cert-manager' not in names
     assert not any(ns=='roboshop-ai' and kind in ('Deployment','StatefulSet') for _,kind,ns,_ in owners)
 
@@ -28,7 +28,7 @@ def test_catalog_contains_only_projects_and_applications():
 
 
 def test_adoption_baselines_have_no_credentials_or_server_metadata():
-    for path in (ROOT/'minikube/gitops/adoption').glob('*/resources.yaml'):
+    for path in (ROOT/'deploy/minikube/gitops/adoption').glob('*/resources.yaml'):
         for doc in yaml.safe_load_all(path.read_text()):
             assert doc['kind']!='Secret'
             assert 'status' not in doc
@@ -124,9 +124,9 @@ def test_frontend_and_nginx_are_retired_into_web():
 
 def test_retired_ingestion_has_no_deployable_or_runtime_references():
     assert not (APP/'services/product-ingestion').exists()
-    assert not (ROOT/'minikube/gitops/adoption/product-ingestion').exists()
+    assert not (ROOT/'deploy/minikube/gitops/adoption/product-ingestion').exists()
     assert not (ARGOCD/'product-ingestion.yaml').exists()
-    roots=[APP/'services', APP/'.github/workflows', ROOT/'scripts', ARGOCD, ROOT/'infrastructure', ROOT/'minikube']
+    roots=[APP/'services', APP/'.github/workflows', ROOT/'scripts', ARGOCD, ROOT/'infrastructure', ROOT/'deploy/minikube']
     for directory in roots:
         assert directory.is_dir(),directory
         for path in directory.rglob('*'):

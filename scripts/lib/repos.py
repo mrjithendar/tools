@@ -5,7 +5,7 @@ Kubernetes manifests and tests live in roboshop-ai.git, and the shared jithendar
 in jithendar.com.git. Both are expected as sibling checkouts of tools (override with
 ROBOSHOP_AI_DIR / JITHENDAR_COM_DIR).
 
-CATALOGS holds what deploy.py manages on mk4: tools/minikube-argocd (the shared platform and monitoring
+CATALOGS holds what deploy.py manages on mk4: tools/deploy/minikube/applications (the shared platform and monitoring
 stack). The shop's Applications are in roboshop-ai/argocd-eks; they target the roboshop-demo EKS
 cluster, so these tools read them only to check them.
 """
@@ -17,7 +17,7 @@ TOOLS = ROOT
 APP = Path(os.environ.get('ROBOSHOP_AI_DIR', TOOLS.parent / 'roboshop-ai')).resolve()
 SITE = Path(os.environ.get('JITHENDAR_COM_DIR', TOOLS.parent / 'jithendar.com')).resolve()
 ARGOCD = APP / 'argocd-eks'                         # roboshop-ai's Argo CD Applications for EKS
-MONITORING_ARGOCD = TOOLS / 'minikube-argocd'                # monitoring stack Applications (Grafana, Prometheus, Loki)
+MONITORING_ARGOCD = TOOLS / 'deploy/minikube/applications'                # monitoring stack Applications (Grafana, Prometheus, Loki)
 CATALOGS = (MONITORING_ARGOCD,)
 TOOLS_REPO = 'https://github.com/mrjithendar/tools.git'
 APP_REPO = 'https://github.com/mrjithendar/roboshop-ai.git'

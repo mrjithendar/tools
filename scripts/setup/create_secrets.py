@@ -95,11 +95,11 @@ def main(argv=None):
         if target == 'roboshop':
             module('scripts/argocd/bootstrap.py').ensure_app_secrets(args.context)
         elif target == 'monitoring':
-            module('observability/credentials.py').Credentials(args.context).ensure()
+            module('deploy/minikube/observability/credentials.py').Credentials(args.context).ensure()
         elif target == 'wordpress':
             create_wordpress(args.context)
         elif target == 'jfrog':
-            module('minikube/jfrog/bootstrap.py').ensure(args.context)
+            module('deploy/minikube/jfrog/bootstrap.py').ensure(args.context)
     if args.ecr:
         module('scripts/argocd/bootstrap.py').refresh_pull_secrets(args.context)
     print('Done. No workloads restarted and no existing credentials rotated.')

@@ -6,8 +6,8 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-APPS = ROOT / 'eks-argocd/applications'
-PLATFORM = ROOT / 'eks-argocd/platform'
+APPS = ROOT / 'deploy/eks/applications'
+PLATFORM = ROOT / 'deploy/eks/helm-values'
 RELEASES = {
     'aws-load-balancer-controller': 'kube-system',
     'istio-base': 'istio-system',
@@ -15,7 +15,6 @@ RELEASES = {
     'istio-ingressgateway': 'istio-ingress',
     'metrics-server': 'kube-system',
     'prometheus-agent': 'monitoring',
-    'letsencrypt-issuers': 'cert-manager',
     'kiali': 'istio-system',
     'kiali-prometheus': 'istio-system',
 }
@@ -47,6 +46,17 @@ def test_project_allows_every_destination_and_source(release, namespace):
     assert all(s['repoURL'] in project['sourceRepos'] for s in spec.get('sources', [spec.get('source')]))
 
 
+def test_plain_applications_are_allowed_by_the_project():
+    project = load(APPS / 'project-eks-platform.yaml')['spec']
+    for name, namespace in (('letsencrypt-issuers', 'cert-manager'), ('ingress', 'istio-ingress'), ('bootstrap', 'roboshop-ai')):
+        spec = app(name)['spec']
+        assert spec['project'] == 'eks-platform'
+        assert spec['destination'] == {'name': 'roboshop-demo', 'namespace': namespace}
+        assert {'namespace': namespace, 'name': 'roboshop-demo'} in project['destinations']
+        assert spec['source']['repoURL'] in project['sourceRepos']
+        assert 'automated' not in spec['syncPolicy']
+
+
 def test_istio_charts_share_one_version():
     versions = {app(r)['spec'].get('source', app(r)['spec'].get('sources', [{}])[0])['targetRevision'] for r in ('istio-base', 'istiod', 'istio-ingressgateway')}
     assert len(versions) == 1
@@ -73,7 +83,7 @@ def test_kiali_is_read_only_behind_a_login_with_a_stable_key():
 
 
 def test_kiali_route_matches_its_web_root_and_service():
-    route = load(ROOT / 'eks-argocd/roboshop-demo/ingress/kiali-virtualservice.yaml')['spec']['http'][0]
+    route = load(ROOT / 'deploy/eks/manifests/ingress/kiali-virtualservice.yaml')['spec']['http'][0]
     assert route['match'] == [{'uri': {'prefix': load(PLATFORM / 'kiali.yaml')['server']['web_root']}}]
     assert 'rewrite' not in route
 
@@ -83,7 +93,7 @@ def test_kube_state_metrics_is_scraped_and_bounded(values, job):
     jobs = load(PLATFORM / values)['serverFiles']['prometheus.yml']['scrape_configs']
     keep = next(j for j in jobs if j['job_name'] == job)['metric_relabel_configs'][0]
     assert keep['action'] == 'keep' and keep['source_labels'] == ['__name__']
-    dashboards = ''.join(p.read_text() for p in (ROOT / 'observability/grafana/dashboards').glob('*.json'))
+    dashboards = ''.join(p.read_text() for p in (ROOT / 'deploy/minikube/observability/grafana/dashboards').glob('*.json'))
     for metric in set(re.findall(r'\bkube_[a-z0-9_]+', dashboards)) - {'kube_namespaces', 'kube_identity'}:
         assert re.fullmatch(keep['regex'], metric), metric
 

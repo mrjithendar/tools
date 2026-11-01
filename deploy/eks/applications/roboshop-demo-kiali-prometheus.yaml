@@ -1,0 +1,30 @@
+# Mesh metrics for Kiali. Separate from roboshop-demo-prometheus-agent, which only pushes node metrics to mk4.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: roboshop-demo-kiali-prometheus
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: roboshop-gitops
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  project: eks-platform
+  destination:
+    name: roboshop-demo
+    namespace: istio-system
+  syncPolicy:
+    syncOptions:
+    - FailOnSharedResource=true
+    - PruneLast=true
+  sources:
+  - repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus
+    targetRevision: 29.40.3
+    helm:
+      releaseName: kiali-prometheus
+      valueFiles:
+      - $values/deploy/eks/helm-values/kiali-prometheus.yaml
+  - repoURL: https://github.com/mrjithendar/tools.git
+    targetRevision: master
+    ref: values
