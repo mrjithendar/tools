@@ -3,12 +3,8 @@
 flowchart TD
   browser["Browser"]
 
-  subgraph mk4["mk4 (jithendar.com resolves here)"]
-    traefik["Traefik<br/>only /roboshop goes to EKS<br/>/, /grafana, /argocd and the rest stay here"]
-  end
-
   subgraph aws["AWS: roboshop-demo VPC"]
-    nlb["Internet-facing NLB<br/>TCP 443 passthrough, IP targets<br/>sources limited to the edge and admin"]
+    nlb["Internet-facing NLB<br/>TCP 443 and 80 passthrough, IP targets"]
 
     subgraph ingress["istio-ingress"]
       gateway["Istio ingress gateway<br/>strips /roboshop, routes only /roboshop/*"]
@@ -32,10 +28,9 @@ flowchart TD
     end
   end
 
-  browser -- "HTTPS: public TLS 1 terminates at Traefik" --> traefik
-  traefik -- "HTTPS: public TLS 2, certificate verified" --> nlb
+  browser -- "HTTPS" --> nlb
   nlb -- "TCP, still the same TLS session" --> gateway
-  gateway == "public TLS 2 terminates here; mesh mTLS begins" ==> web
+  gateway == "public TLS terminates here; mesh mTLS begins" ==> web
   web == mTLS ==> aigw
   web == mTLS ==> moks
   web == mTLS ==> currency

@@ -3,8 +3,7 @@
 Takes `https://jithendar.com/roboshop` from mk4 to EKS. Background and design: [README.md](README.md).
 
 **This has never been run on EKS.** Each step says what to expect; stop and use [Troubleshooting](#troubleshooting) if the
-output differs. Public traffic does not move until step 10, and until then the only effect on the website is the Traefik
-restart in that step. An NLB is billed from step 4.
+output differs. Public traffic does not move until step 10. An NLB is billed from step 4.
 
 Never sync with prune. Never run `kubectl apply` for resources in `eks/` by hand; change Git and sync.
 
@@ -32,11 +31,10 @@ argocd login jithendar.com --grpc-web --grpc-web-root-path /argocd --username ad
 ```bash
 kubectl --context $EKS get nodes
 kubectl --context $EKS -n roboshop-ai get pods
-curl -s -o /dev/null -w '%{http_code}\n' https://jithendar.com/roboshop/
 git -C ../roboshop-ai log -1 --format=%h
 ```
 
-Expected: two `Ready` nodes, every pod `Running` and ready, `200` from mk4, and `391b441` or a later commit that keeps
+Expected: two `Ready` nodes, every pod `Running` and ready, and `391b441` or a later commit that keeps
 `argocd-eks` compatible.
 
 Do not continue until the application is healthy without the mesh, or a mesh problem and an application problem will look
@@ -81,7 +79,7 @@ kubectl --context $MK4 apply -f eks/applications/
 kubectl --context $MK4 apply -k ../roboshop-ai/argocd-eks
 ```
 
-Expected: `configured` or `created`. **Do not sync `roboshop-demo-edge`.** After this, the 15 changed Applications show `OutOfSync`
+Expected: `configured` or `created`. After this, the 15 changed Applications show `OutOfSync`
 until step 6, which is expected.
 
 ## 4. Install the controllers and the NLB
@@ -167,7 +165,7 @@ aws ec2 describe-security-groups --group-ids $SG --query 'SecurityGroups[].IpPer
 ```
 
 Expected: `internet-facing active network`; two listeners, `443 TCP` and `80 TCP`; two `healthy` targets per listener; the
-frontend group allows 443 and 80 from exactly your two CIDRs. No `15021`, no `0.0.0.0/0` until [Retiring mk4](#retiring-mk4).
+frontend group allows 443 and 80 from exactly the listed addresses. No `15021`, no `0.0.0.0/0` until [step 10](#10-public-cutover).
 
 ## 5. Certificate and gateway
 
@@ -331,71 +329,18 @@ kubectl --context $EKS -n roboshop-ai port-forward deploy/mcp-server 4107:4107
 
 ## 10. Public cutover
 
-Three changes, in order. Traefik's upgrade restarts its single replica, which briefly affects **all of jithendar.com**, so pick a
-quiet moment. The commit to `minikube/traefik/values.yaml` is already pushed.
-
-**DNS.** In Cloudflare, add this for the `jithendar.com` zone. Leave `jithendar.com` and `www` alone.
-
-| Type | Name | Target | Proxy status |
-|---|---|---|---|
-| CNAME | `roboshop-origin` | the value of `$NLB_HOST` | **DNS only** |
-
-```bash
-dig +short roboshop-origin.jithendar.com
-```
-
-Expected: the NLB name, then its addresses. DNS only matters: if proxied, Cloudflare would terminate the connection.
-
-**Traefik.**
-
-```bash
-KUBE_CONTEXT=$MK4 bash minikube/deploy-traefik.sh
-curl -s -o /dev/null -w '%{http_code}\n' https://jithendar.com/
-```
-
-Expected: Helm upgrades to a new revision, and `200` from the website.
-
-**Cutover.**
-
-```bash
-argocd app sync argocd/roboshop-demo-edge
-kubectl --context $MK4 -n roboshop-ai get ingressroute roboshop-eks
-```
-
-This is the moment public traffic moves.
-
-## 11. Public smoke test
-
-```bash
-B=https://jithendar.com
-curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' "$B/roboshop?utm=x"
-curl -sI "$B/roboshop/" | grep -iE '^(HTTP|server)'
-curl -s -o /dev/null -w '%{http_code} home\n' "$B/"
-curl -s -o /dev/null -w '%{http_code} grafana\n' "$B/grafana/login"
-curl -s -o /dev/null -w '%{http_code} http\n' "http://jithendar.com/roboshop/"
-kubectl --context $EKS -n roboshop-ai logs deploy/web -c web --since=2m | tail -3
-```
-
-Expected: `308 https://jithendar.com/roboshop/?utm=x`; `HTTP/2 200` with `server: istio-envoy`, where mk4 answers `server: nginx`; `200` home; `200` grafana; `308` or `301` to HTTPS; requests in the EKS web log. Then repeat the browser flow from step 7
-without the `/etc/hosts` line.
-
-A `200` here also proves Traefik verified the gateway's certificate. Keep the mk4 RoboShop running until you are satisfied.
-
-## Retiring mk4
-
-Browsers then reach the NLB directly, with nothing in front of it. **Do not start until steps 8 and 9 pass.** The DNS change
-moves every path on the hostname, and today's `roboshop` VirtualService answers `404` for everything except `/roboshop`.
-
-Everything below runs on mk4 and needs a new home first:
+Browsers then reach the NLB directly. **Do not start until steps 8 and 9 pass.** The DNS change moves every path on the
+hostname, and the `roboshop` VirtualService answers `404` for everything except `/roboshop`. These run on mk4 behind its Traefik
+and stop being reachable at `jithendar.com` unless they have moved first:
 
 | What | Where it is now | What depends on it |
 |---|---|---|
 | Next.js website | `jithendar.com/`, `www.jithendar.com` | The apex record; `www` also needs adding to the Gateway and Certificate |
-| Argo CD | `/argocd` | It is the hub that deploys `roboshop-demo` to EKS |
+| Argo CD | `/argocd` | It is the hub that deploys `roboshop-demo`; the `argocd` CLI logs in through this path |
 | Prometheus, Grafana | `/prometheus`, `/grafana` | `remoteWrite` in `eks/platform/prometheus-agent.yaml` |
 | Moks portal | `/moks` paths | Its own Argo application and schema |
 
-Then open the NLB. In `eks/platform/istio-ingressgateway.yaml` set:
+Open the NLB. In `eks/platform/istio-ingressgateway.yaml` set:
 
 ```yaml
 loadBalancerSourceRanges:
@@ -412,23 +357,30 @@ curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' --resolve jithendar.com
 Expected: `200`, then `301 https://jithendar.com/roboshop/`.
 
 In Cloudflare, change the `jithendar.com` record to a **DNS only** CNAME for `$NLB_HOST`; Cloudflare flattens it at the apex.
-This is the moment mk4 stops taking public traffic. Roll back by restoring the `46.224.38.14` A record.
+This is the moment public traffic moves. If proxied, Cloudflare would terminate the connection.
 
-Once the site has been stable long enough to trust: remove `46.224.38.14/32` from `eks_public_access_cidrs`, delete
-`roboshop-demo-edge` and the `roboshop-origin` record, and only then delete mk4.
+## 11. Public smoke test
+
+```bash
+B=https://jithendar.com
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' "$B/roboshop?utm=x"
+curl -sI "$B/roboshop/" | grep -iE '^(HTTP|server)'
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' "http://jithendar.com/roboshop/"
+kubectl --context $EKS -n roboshop-ai logs deploy/web -c web --since=2m | tail -3
+```
+
+Expected: `308 https://jithendar.com/roboshop/?utm=x`; `HTTP/2 200` with `server: istio-envoy`; `301` to HTTPS; requests in the EKS
+web log. Then repeat the browser flow from step 7 without the `/etc/hosts` line.
+
+## Retiring mk4
+
+Once the site has been stable long enough to trust: remove `46.224.38.14/32` from `eks_public_access_cidrs`, and only then
+delete mk4.
 
 ## Rollback
 
-Each level leaves the main website alone, because only `/roboshop` ever moved.
-
-**Public traffic back to mk4.** Takes effect within seconds and needs no Git change:
-
-```bash
-kubectl --context $MK4 -n roboshop-ai delete ingressroute roboshop-eks
-curl -sI https://jithendar.com/roboshop/ | grep -i '^server'
-```
-
-Expected: `server: nginx`. The mk4 Ingress was never removed, so it takes over. Do not sync `roboshop-demo-edge` again until ready.
+**Public traffic.** Restore the `jithendar.com` A record to `46.224.38.14`. That brings back what mk4 still serves. It does not
+bring back the shop: the `roboshop-ai` namespace on mk4 has been deleted.
 
 **Mesh policy.** See the fast rollback in step 8.
 
@@ -442,13 +394,11 @@ argocd app sync --project eks
 kubectl --context $EKS -n roboshop-ai rollout restart deployment
 ```
 
-**Remove everything.** Sidecars first, as above, and public traffic must already be on mk4. Removing the CRDs before these
+**Remove everything.** Sidecars first, as above, and DNS must already be off the NLB. Removing the CRDs before these
 Applications would leave them failing.
 
 ```bash
-kubectl --context $MK4 -n argocd delete application roboshop-demo-edge roboshop-demo-ingress roboshop-demo-mesh
-kubectl --context $MK4 -n roboshop-ai delete service roboshop-eks-origin
-kubectl --context $MK4 -n roboshop-ai delete serverstransport roboshop-eks-origin
+kubectl --context $MK4 -n argocd delete application roboshop-demo-ingress roboshop-demo-mesh
 kubectl --context $EKS -n istio-ingress delete virtualservice,gateway,certificate --all
 kubectl --context $EKS -n roboshop-ai delete authorizationpolicy,peerauthentication --all
 ```
@@ -463,7 +413,7 @@ kubectl --context $EKS delete namespace istio-ingress istio-system
 kubectl --context $EKS -n kube-system delete deployment aws-load-balancer-controller
 ```
 
-Set `eks_ingress_enabled = false`, then commit and push. Delete the `roboshop-origin` record. Check nothing is left:
+Set `eks_ingress_enabled = false`, then commit and push. Check nothing is left:
 
 ```bash
 aws elbv2 describe-load-balancers --names roboshop-demo-ingress 2>&1 | grep -c LoadBalancerNotFound
@@ -491,16 +441,15 @@ kubectl --context $EKS -n istio-ingress delete telemetry debug-access-logs
 
 | Symptom | Likely cause | Check and fix |
 |---|---|---|
-| `404` with an empty body and no `x-envoy-upstream-service-time` header | The gateway has no route: wrong Host, or a path outside `/roboshop/`. | `istioctl -n istio-ingress proxy-config routes deploy/istio-ingressgateway`. Check Traefik sets `Host: jithendar.com`. |
-| `404` with `x-envoy-upstream-service-time` | The request reached web with the wrong path, usually prefix not stripped or stripped twice. | The web log shows the path it got. It must have no `/roboshop`. A strip middleware on the IngressRoute would break this; there must be none. |
+| `404` with an empty body and no `x-envoy-upstream-service-time` header | The gateway has no route: wrong Host, or a path outside `/roboshop/`. | `istioctl -n istio-ingress proxy-config routes deploy/istio-ingressgateway`. Check the request's `Host` is `jithendar.com`. |
+| `404` with `x-envoy-upstream-service-time` | The request reached web with the wrong path, usually prefix not stripped or stripped twice. | The web log shows the path it got. It must have no `/roboshop`. The only rewrite is in the VirtualService. |
 | Page loads with no styling or broken links | Assets requested without the prefix, or `FRONTEND_BASE_PATH` changed. | View source: `src` must start `/roboshop/`. A page opened at `/roboshop` without the slash should have been redirected. |
 | `503` with `UF` or `URX`, TLS error in logs | Sidecar mismatch: a pod without a sidecar under STRICT, or passthrough to a meshed service. | `istioctl -n roboshop-ai x describe pod <pod>`. Restart pods created before the namespace label. |
 | `503`, `no healthy upstream` | web has no ready pods. | `kubectl -n roboshop-ai get pods`, then `kubectl -n roboshop-ai describe pod`. |
 | `502` or `504` on `/api/*`, and `web` not Ready | web cannot reach ai-gateway. The Service must have `appProtocol: tcp`. | `kubectl -n roboshop-ai get svc ai-gateway -o jsonpath='{.spec.ports[0].appProtocol}'`. Without it, `Host: jithendar.com` falls into passthrough and fails under STRICT. |
 | `403 RBAC: access denied`, or resets on ai-gateway | A policy is missing a legitimate caller. | `istioctl -n roboshop-ai proxy-config log deploy/<dest> --level rbac:debug` and read the log. Fix in Git, or use the fast rollback. |
-| `502` from Traefik, `tls: failed to verify` | The gateway serves no or the wrong certificate, or a staging one. | Step 5 `openssl` command. A staging issuer never passes. |
-| `502`/`504` from Traefik, timeout | mk4's address changed or left `eks/platform/istio-ingressgateway.yaml`, or the CNAME is wrong. | `dig`, the security group from step 4. Test from mk4. |
-| `ExternalName` errors in the Traefik log, `/roboshop` `404` | `allowExternalNameServices` not applied. | `kubectl --context mk4 -n traefik get deploy traefik -o yaml \| grep -i externalname`, then rerun `deploy-traefik.sh`. |
+| Browser certificate error | The gateway serves no or the wrong certificate, or a staging one. | Step 5 `openssl` command. A staging issuer never passes. |
+| Timeout connecting to the NLB | The address is not in `eks/platform/istio-ingressgateway.yaml`, or DNS is wrong. | `dig`, and the security group from step 4. |
 | TLS handshake resets at the gateway | No `Gateway` synced, or the Secret is absent, so Envoy has no 443 filter chain. | `istioctl -n istio-ingress proxy-config listeners deploy/istio-ingressgateway --port 443`, `kubectl -n istio-ingress get secret`. |
 | Certificate stuck `False` | Issuer not ready or a DNS-01 failure. | `kubectl -n istio-ingress get certificaterequest,order,challenge`, `kubectl describe challenge`. `InvalidSolver` means the Cloudflare Secret is missing. A `403` from Cloudflare means the token lacks DNS edit on this zone. |
 | Issuer `Ready=False`, `secrets not found` | Step 2 not done. | `kubectl -n cert-manager get secret cloudflare-api-token`. |

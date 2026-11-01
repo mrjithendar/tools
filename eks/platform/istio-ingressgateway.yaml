@@ -22,10 +22,9 @@ service:
   type: LoadBalancer
   loadBalancerClass: service.k8s.aws/nlb
   allocateLoadBalancerNodePorts: false # IP targets reach the pods directly
-  # Becomes the NLB's frontend security group: mk4's edge, home IP. An empty list opens the NLB to the Internet;
-  # 0.0.0.0/0 is set here at eks/RUNBOOK.md, Retiring mk4.
+  # Becomes the NLB's frontend security group: home IP. An empty list opens the NLB to the Internet;
+  # 0.0.0.0/0 is set here at eks/RUNBOOK.md step 10.
   loadBalancerSourceRanges:
-  - 46.224.38.14/32
   - 122.177.247.138/32
   # Only Service ports become listeners, so the 15021 status port stays private and is used solely by the health
   # check. Port 80 only redirects to HTTPS, through the Gateway in eks/roboshop-demo/ingress.

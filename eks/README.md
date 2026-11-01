@@ -18,7 +18,6 @@ Like the mk4 Applications, they do not sync automatically and must never be sync
 | `applications/roboshop-demo-*.yaml`, `platform/` | AWS Load Balancer Controller, Istio base, istiod, gateway and NLB Service, metrics-server, Prometheus agent, Let's Encrypt issuers, with their values | Argo CD, project `eks-platform` |
 | `roboshop-demo/ingress/` | Certificate, Gateway, VirtualService | Argo CD: `roboshop-demo-ingress` |
 | `roboshop-demo/mesh/` | ServiceAccounts, PeerAuthentication, AuthorizationPolicies | Argo CD: `roboshop-demo-mesh` |
-| `edge/` | On **mk4**: the Traefik route that sends `/roboshop` to the NLB | Argo CD: `roboshop-demo-edge`; syncing it is the cutover |
 | `roboshop-ai-catalog.patch` | The change to `roboshop-ai/argocd-eks`, which owns the workloads | `git apply` in roboshop-ai ([why](#the-roboshop-ai-patch)) |
 | `diagrams/roboshop-ingress.mmd` | Editable source of the diagram below | |
 
@@ -28,34 +27,21 @@ separate one (`argocd/cert-manager.yaml`).
 Each resource has one owner. Minikube is unchanged: its Applications select files with `directory.include` and ignore the
 new `kustomization.yaml` files, and the namespace label and ServiceAccounts exist only on EKS.
 
-## Why the browser does not reach the NLB directly
+## How the browser reaches EKS
 
-Inspected on 2026-10-31: `jithendar.com` is a DNS-only Cloudflare A record for `46.224.38.14`, which is mk4. Traefik there
-terminates TLS and routes by path: the Next.js site, `/grafana`, `/argocd`, `/prometheus` and `/roboshop` all share that
-hostname. An NLB works at TCP level and cannot route by path, and a DNS record cannot name a path. Pointing the apex at the
-NLB would take the whole website with it.
+Browsers connect straight to the NLB, with nothing in front of it. TLS ends on the Istio gateway. The NLB stays limited to
+the addresses in `platform/istio-ingressgateway.yaml` until the [public cutover](RUNBOOK.md#10-public-cutover).
 
-This repository controls Traefik, so the path routing stays there and only `/roboshop` moves. That differs from the
-default `Browser → NLB` in one way: **the browser's TLS session ends at Traefik on mk4**, and Traefik opens a second,
-verified TLS session to the Istio gateway through the NLB. Only the two addresses in `platform/istio-ingressgateway.yaml` can reach
-the NLB.
-
-This path is temporary, because mk4 will be deleted. The NLB already listens on 443 and 80, and its allowlist in
-`platform/istio-ingressgateway.yaml` accepts `0.0.0.0/0`. Everything else that lives on mk4 has to move first: see [Retiring mk4](RUNBOOK.md#retiring-mk4).
-
-The only external change is one DNS record for a **hostname**: `roboshop-origin.jithendar.com`, a DNS-only CNAME to the NLB.
-It keeps the generated load balancer name out of Git. The apex and `www` records are not touched.
+An NLB works at TCP level and a DNS record cannot name a path, so `jithendar.com` moves as a whole. Today that record
+still points at mk4, whose Traefik serves the Next.js site, `/argocd`, `/grafana`, `/prometheus` and Moks. The cutover
+takes all of them off the hostname unless they have moved first.
 
 ```mermaid
 flowchart TD
   browser["Browser"]
 
-  subgraph mk4["mk4 (jithendar.com resolves here)"]
-    traefik["Traefik<br/>only /roboshop goes to EKS<br/>/, /grafana, /argocd and the rest stay here"]
-  end
-
   subgraph aws["AWS: roboshop-demo VPC"]
-    nlb["Internet-facing NLB<br/>TCP 443 passthrough, IP targets<br/>sources limited to the edge and admin"]
+    nlb["Internet-facing NLB<br/>TCP 443 and 80 passthrough, IP targets"]
 
     subgraph ingress["istio-ingress"]
       gateway["Istio ingress gateway<br/>strips /roboshop, routes only /roboshop/*"]
@@ -79,10 +65,9 @@ flowchart TD
     end
   end
 
-  browser -- "HTTPS: public TLS 1 terminates at Traefik" --> traefik
-  traefik -- "HTTPS: public TLS 2, certificate verified" --> nlb
+  browser -- "HTTPS" --> nlb
   nlb -- "TCP, still the same TLS session" --> gateway
-  gateway == "public TLS 2 terminates here; mesh mTLS begins" ==> web
+  gateway == "public TLS terminates here; mesh mTLS begins" ==> web
   web == mTLS ==> aigw
   web == mTLS ==> moks
   web == mTLS ==> currency
@@ -107,13 +92,13 @@ flowchart TD
 
 ## Ingress
 
-**NLB.** Internet-facing, IP targets (gateway pods registered directly), TCP passthrough on 443. Set in
-`infrastructure/eks-ingress.tf`:
+**NLB.** Internet-facing, IP targets (gateway pods registered directly), TCP passthrough on 443 and 80. Set in
+`platform/istio-ingressgateway.yaml`:
 
 | Setting | Why |
 |---|---|
 | `spec.loadBalancerClass: service.k8s.aws/nlb` | Hands the Service to the controller. Its Service webhook is off, so nothing else is picked up. |
-| `aws-load-balancer-scheme: internet-facing` | The default is `internal`, which mk4 could not reach. |
+| `aws-load-balancer-scheme: internet-facing` | The default is `internal`, which browsers could not reach. |
 | `aws-load-balancer-nlb-target-type: ip` | The default is `instance`. No NodePorts, so `allocateLoadBalancerNodePorts: false`. |
 | `aws-load-balancer-subnets` | The two public subnets from Terraform, explicit rather than discovered. |
 | `aws-load-balancer-name` | A stable name for `aws elbv2` commands. It has no effect if changed after creation. |
@@ -132,19 +117,17 @@ NGINX answers `/metrics` with 404.
 
 | Hop | Path | Behaviour |
 |---|---|---|
-| Browser → Traefik | `/roboshop/products/x?a=1` | Routed only for `Path(/roboshop)` or `PathPrefix(/roboshop/)`. No stripPrefix. |
-| Traefik → gateway | `/roboshop/products/x?a=1` | Unchanged, `Host: jithendar.com` kept. |
+| Browser → gateway | `/roboshop/products/x?a=1` | Routed only for `/roboshop` and `/roboshop/`, with `Host: jithendar.com`. |
 | Gateway → web | `/products/x?a=1` | **The prefix is stripped here.** `/roboshop` alone gets a 308 to `/roboshop/`, keeping the query. |
-| web | `/products/x?a=1` | Same as behind Traefik on mk4: `FRONTEND_BASE_PATH=/roboshop` only rewrites HTML attributes. |
+| web | `/products/x?a=1` | `FRONTEND_BASE_PATH=/roboshop` only rewrites HTML attributes. |
 
 Nothing in the web image changes. Assets and API calls resolve from the module URL (`paths.ts`), there is no SPA catch-all
 (NGINX maps each URL to a file, so refreshes work), and uploads keep NGINX's 2 MiB limit. Cookies are `Path=/; Secure;
-HttpOnly; SameSite=Strict`, so they keep working, but as on mk4 the browser also sends them to the rest of `jithendar.com`.
+HttpOnly; SameSite=Strict`, so they keep working, but the browser also sends them to the rest of `jithendar.com`.
 Public and private API boundaries stay in NGINX: `/api/chat` is 403, `/metrics` is 404, and `mcp-server` has no route.
 
 **Moks does not stream.** `/moks/chat` returns one JSON response after up to 26 s, and the gateway has no event-stream
-code. So nothing here truncates it, on purpose: the VirtualService has no timeout, Traefik's response-header timeout is 0
-and it flushes streamed responses, and the NLB idle timeout is 350 s. NGINX is the real limit, at 30 s for `/moks/*` and 35 s
+code. So nothing here truncates it, on purpose: the VirtualService has no timeout, and the NLB idle timeout is 350 s. NGINX is the real limit, at 30 s for `/moks/*` and 35 s
 for `/api/*`. `/api/*` has `proxy_buffering off`, but the `/moks/*` locations do not: if Moks ever streams, those need it too,
 which is a change to the web image.
 
@@ -152,7 +135,7 @@ which is a change to the web image.
 
 | | Public TLS | Mesh mTLS |
 |---|---|---|
-| Protects | Browser to Traefik, and Traefik to gateway | Pod to pod inside `roboshop-ai` |
+| Protects | Browser to gateway | Pod to pod inside `roboshop-ai` |
 | Certificates | Let's Encrypt for `jithendar.com`, from cert-manager | Short-lived workload certificates from istiod, rotated automatically |
 | Proves | The server is `jithendar.com` | The caller is workload X; both sides are authenticated |
 
@@ -161,7 +144,7 @@ Neither replaces the other, and neither replaces user login.
 **Certificate.** `letsencrypt-prod` already exists on EKS from the `roboshop-demo-letsencrypt-issuers` Application. It uses DNS-01 through
 Cloudflare because Let's Encrypt cannot reach this cluster over HTTP. cert-manager writes `jithendar-com-tls` into
 `istio-ingress`, where `credentialName` looks it up, and renews 30 days before expiry; the gateway reloads it without a
-restart, and Traefik simply verifies the new one. The Cloudflare token is the only credential, and it is created by hand in
+restart. The Cloudflare token is the only credential, and it is created by hand in
 `cert-manager`, never in Git. **It is missing today**, so both issuers report `Ready=False`. The mk4 certificate is
 independent. Both clusters count toward Let's Encrypt's limit of 5 duplicate certificates a week.
 
@@ -234,7 +217,6 @@ Checked 2026-10-31 against the Istio support table, the Helm repositories and Gi
 | AWS Load Balancer Controller | 3.6.2 (chart 3.6.2) | `applications/roboshop-demo-aws-load-balancer-controller.yaml` | Latest release. IAM policy is the unmodified upstream `docs/install/iam_policy.json` of that tag, sha256 `16f232c9...a6a`. It covers ALB features this does not use; they are off with `enableShield/Waf/Wafv2=false`. |
 | Istio base, istiod, gateway | 1.30.7 | `applications/roboshop-demo-istio-*.yaml` | Supports Kubernetes 1.32-1.36. **End of life ~December 2026.** 1.31.3 is released and supports 1.32-1.37, but its charts are in neither the Helm repository nor the OCI registry yet. Move when they are. |
 | cert-manager | EKS add-on, AWS default for 1.36 | `eks-addons.tf` | Existing |
-| Traefik | chart 42.0.0, v3.7.14 | `minikube/deploy-traefik.sh` | `ServersTransport` and `IngressRoute` CRDs confirmed on mk4 |
 | Argo CD | v3.5.5 | mk4 | `Application` kustomize patches already in use |
 | Terraform | 1.16.6 | workflows | AWS provider ~> 6.0 |
 

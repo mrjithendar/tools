@@ -20,7 +20,6 @@ from repos import APP  # noqa: E402
 EKS = ROOT / 'eks'
 INGRESS = EKS / 'roboshop-demo/ingress'
 MESH = EKS / 'roboshop-demo/mesh'
-EDGE = EKS / 'edge'
 GATEWAY = 'istio-ingress/sa/istio-ingressgateway'
 # Every in-mesh call, read from the service code and env (eks/README.md). Workload -> port, allowed callers.
 MATRIX = {
@@ -93,30 +92,14 @@ def test_no_route_deadline_cuts_off_long_answers():
 
 
 def test_prefix_is_stripped_at_exactly_one_boundary():
-    ingressroute = load(EDGE / 'roboshop-eks-ingressroute.yaml')
-    assert 'middlewares' not in ingressroute['spec']['routes'][0]
     assert sum('rewrite' in rule for rule in virtual_service()) == 1
 
 
-def test_edge_only_takes_roboshop_and_keeps_the_host():
-    route_ = load(EDGE / 'roboshop-eks-ingressroute.yaml')['spec']['routes'][0]
-    assert route_['match'] == 'Host(`jithendar.com`) && (Path(`/roboshop`) || PathPrefix(`/roboshop/`))'
-    assert route_['services'][0]['passHostHeader'] is True
-    assert route_['services'][0]['scheme'] == 'https'
-
-
-def test_edge_verifies_the_certificate_the_gateway_serves():
-    transport = load(EDGE / 'roboshop-eks-origin-serverstransport.yaml')['spec']
-    assert 'insecureSkipVerify' not in transport
+def test_gateway_serves_the_certificate_it_is_issued():
     certificate = load(INGRESS / 'jithendar-com-certificate.yaml')['spec']
-    assert transport['serverName'] in certificate['dnsNames']
     server = load(INGRESS / 'public-gateway.yaml')['spec']['servers'][0]
     assert server['tls']['credentialName'] == certificate['secretName']
-    assert transport['serverName'] in server['hosts']
-
-
-def test_traefik_may_use_the_external_name_service():
-    assert load(ROOT / 'minikube/traefik/values.yaml')['providers']['kubernetesCRD']['allowExternalNameServices'] is True
+    assert set(server['hosts']) <= set(certificate['dnsNames'])
 
 
 def test_authorization_matches_the_call_matrix():
@@ -165,12 +148,6 @@ def test_applications_are_manual_and_allowed_by_the_project(name, dest, project_
     assert app['spec']['destination'] == {'name': dest, 'namespace': project_dest}
     allowed = load(ROOT / 'argocd/project-platform.yaml')['spec']['destinations']
     assert {'namespace': project_dest, 'name': dest} in allowed
-
-
-def test_edge_application_targets_mk4_and_never_syncs_itself():
-    app = load(EKS / 'applications/roboshop-demo-edge.yaml')
-    assert app['spec']['destination'] == {'server': 'https://kubernetes.default.svc', 'namespace': 'roboshop-ai'}
-    assert 'automated' not in app['spec']['syncPolicy']
 
 
 @pytest.fixture(scope='module')
