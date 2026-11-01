@@ -54,8 +54,8 @@ def test_helm_releases_keep_names_and_pinned_versions():
 
 
 def test_shared_namespace_has_valid_metadata():
-    namespace=yaml.safe_load((ROOT/'eks/roboshop/roboshop-ai-namespace.yaml').read_text())
-    config=yaml.safe_load((ROOT/'eks/roboshop/roboshop-config-configmap.yaml').read_text())
+    namespace=yaml.safe_load((APP/'argocd-eks/apps/roboshop/roboshop-ai-namespace.yaml').read_text())
+    config=yaml.safe_load((APP/'argocd-eks/apps/roboshop/roboshop-config-configmap.yaml').read_text())
     assert 'LOG_FORMAT' not in namespace['metadata']
     assert config['data']['LOG_FORMAT']=='json'
 

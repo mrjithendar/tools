@@ -19,7 +19,7 @@ from repos import APP  # noqa: E402
 
 EKS = ROOT / 'eks'
 INGRESS = EKS / 'roboshop-demo/ingress'
-MESH = EKS / 'roboshop-demo/mesh'
+MESH = APP / 'argocd-eks/apps/mesh'
 GATEWAY = 'istio-ingress/sa/istio-ingressgateway'
 # Every in-mesh call, read from the service code and env (eks/README.md). Workload -> port, allowed callers.
 MATRIX = {
@@ -153,7 +153,6 @@ def test_secrets_and_generated_names_stay_out_of_git():
 
 @pytest.mark.parametrize('name,dest,project_dest', [
     ('roboshop-demo-ingress', 'roboshop-demo', 'istio-ingress'),
-    ('roboshop-demo-mesh', 'roboshop-demo', 'roboshop-ai'),
 ])
 def test_applications_are_manual_and_allowed_by_the_project(name, dest, project_dest):
     app = load(EKS / f'applications/{name}.yaml')
@@ -163,15 +162,20 @@ def test_applications_are_manual_and_allowed_by_the_project(name, dest, project_
     assert {'namespace': project_dest, 'name': dest} in allowed
 
 
+def test_mesh_application_is_manual_and_allowed_by_the_project():
+    app = load(APP / 'argocd-eks/mesh.yaml')
+    assert 'automated' not in app['spec']['syncPolicy']
+    assert app['spec']['project'] == 'eks'
+    project = load(APP / 'argocd-eks/project.yaml')['spec']
+    assert {'namespace': 'roboshop-ai', 'name': 'roboshop-demo'} in project['destinations']
+
+
 @pytest.fixture(scope='module')
 def catalog(tmp_path_factory):
-    """roboshop-ai's EKS Applications with the patch from this repository applied, as a temporary copy."""
+    """roboshop-ai's EKS Applications, as a temporary copy that render() can change."""
     root = tmp_path_factory.mktemp('roboshop-ai')
     for name in ('services', 'argocd-eks'):
         shutil.copytree(APP / name, root / name, ignore=shutil.ignore_patterns('node_modules', '.venv', '__pycache__'))
-    if 'serviceAccountName' not in (root / 'argocd-eks/web.yaml').read_text():
-        subprocess.check_call(['git', 'apply', '--unsafe-paths', f'--directory={root}', str(EKS / 'roboshop-ai-catalog.patch')], cwd=root)
-    shutil.copytree(ROOT / 'eks/roboshop', root / 'eks/roboshop')
     return root
 
 
@@ -248,7 +252,7 @@ def test_catalog_enrolls_the_namespace_without_losing_its_prune_protection(catal
 
 
 def test_base_namespace_leaves_the_label_to_the_patch():
-    assert 'labels' not in load(ROOT / 'eks/roboshop/roboshop-ai-namespace.yaml')['metadata']
+    assert 'labels' not in load(APP / 'argocd-eks/apps/roboshop/roboshop-ai-namespace.yaml')['metadata']
 
 
 class Echo(http.server.BaseHTTPRequestHandler):

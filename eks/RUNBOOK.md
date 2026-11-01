@@ -67,8 +67,6 @@ Expected: no NLB, IAM or Helm changes from this work. Investigate anything else 
 
 ```bash
 git add -A && git commit -m 'EKS ingress and mesh, disabled' && git push
-git -C ../roboshop-ai apply ../tools/eks/roboshop-ai-catalog.patch
-git -C ../roboshop-ai add -A argocd-eks services && git -C ../roboshop-ai commit -m 'EKS mesh identities' && git -C ../roboshop-ai push
 ```
 
 Then register the Applications. This changes nothing on either cluster, because none of them sync automatically:
@@ -241,7 +239,7 @@ connecting. **Remove the line afterwards.**
 
 ## 8. Enforce mTLS, then policies
 
-**Stage 1: STRICT.** In `eks/roboshop-demo/mesh/default-peerauthentication.yaml` set `mode: STRICT`, commit, push.
+**Stage 1: STRICT.** In `roboshop-ai/argocd-eks/apps/mesh/default-peerauthentication.yaml` set `mode: STRICT`, commit, push.
 
 ```bash
 argocd app sync argocd/roboshop-demo-mesh
@@ -267,7 +265,7 @@ done
 Expected: every count `0`. For a non-zero count, read the lines, and add the caller to that workload's policy and to `MATRIX` in
 `tests/test_eks_ingress.py` if the call is legitimate. Do not continue until it is zero.
 
-**Stage 3: enforce.** In `eks/roboshop-demo/mesh/kustomization.yaml` delete the whole `patches:` block and its comment, commit, push.
+**Stage 3: enforce.** In `roboshop-ai/argocd-eks/apps/mesh/kustomization.yaml` delete the whole `patches:` block and its comment, commit, push.
 
 ```bash
 argocd app sync argocd/roboshop-demo-mesh
@@ -417,7 +415,7 @@ bring back the shop: the `roboshop-ai` namespace on mk4 has been deleted.
 **Remove the sidecars.** Reverse the patch and restart:
 
 ```bash
-git -C ../roboshop-ai apply -R ../tools/eks/roboshop-ai-catalog.patch   # commit and push
+# In roboshop-ai, remove the serviceAccountName patches from argocd-eks/*.yaml and the label patch from roboshop-config.yaml; commit and push.
 kubectl --context $EKS label namespace roboshop-ai istio-injection-
 kubectl --context $MK4 apply -k ../roboshop-ai/argocd-eks
 argocd app sync --project eks

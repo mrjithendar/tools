@@ -8,7 +8,7 @@ from repos import APP_REPO, TOOLS, checkout  # noqa: E402
 APP = checkout(APP_REPO)  # roboshop-ai: microservices and their manifests
 class Config(unittest.TestCase):
  def test_collector_owns_its_configuration_in_observability(self):
-  data=yaml.safe_load((ROOT/'eks/roboshop/roboshop-config-configmap.yaml').read_text())['data']
+  data=yaml.safe_load((APP/'argocd-eks/apps/roboshop/roboshop-config-configmap.yaml').read_text())['data']
   self.assertNotIn('config.yaml',data)
   self.assertEqual(data['OTEL_EXPORTER_OTLP_TRACES_ENDPOINT'],'http://otel-collector.observability.svc.cluster.local:4318/v1/traces')
   kustomization=yaml.safe_load((ROOT/'observability/otel-collector/kustomization.yaml').read_text())

@@ -18,8 +18,7 @@ Like the mk4 Applications, they do not sync automatically and must never be sync
 | `applications/roboshop-demo-*.yaml`, `platform/` | AWS Load Balancer Controller, Istio base, istiod, gateway and NLB Service, metrics-server, Prometheus agent, Let's Encrypt issuers, with their values | Argo CD, project `eks-platform` |
 | `roboshop-demo/ingress/` | Certificate, Gateway, VirtualService | Argo CD: `roboshop-demo-ingress` |
 | `applications/roboshop-demo-kiali*.yaml` | Kiali at `/kiali` and the small Prometheus it queries | Argo CD, project `eks-platform`; [steps](RUNBOOK.md#kiali) |
-| `roboshop-demo/mesh/` | ServiceAccounts, PeerAuthentication, AuthorizationPolicies | Argo CD: `roboshop-demo-mesh` |
-| `roboshop-ai-catalog.patch` | The change to `roboshop-ai/argocd-eks`, which owns the workloads | `git apply` in roboshop-ai ([why](#the-roboshop-ai-patch)) |
+| `roboshop-ai/argocd-eks` | The workloads, their Applications, the namespace and shared config, the MongoDB catalog, and mesh identities and policies (`apps/mesh`) | Argo CD, project `eks` |
 | `diagrams/roboshop-ingress.mmd` | Editable source of the diagram below | |
 
 Controllers are Argo CD Applications in `applications/`, in project `eks-platform`, with their values in `platform/`. Terraform
@@ -199,17 +198,14 @@ and policies on it can only use identities and ports, which is all they do.
 web pod; here it is the sidecar's `127.0.0.6`. All visitors share the 300 per minute and AI limits on both clusters.
 Fixing it takes a change to the web image. Nothing in the services treats loopback as trusted, so sidecars do not widen access.
 
-## The roboshop-ai patch
+## What roboshop-ai owns
 
-Istio identity comes from the pod's ServiceAccount, and enrollment needs a namespace label, but `roboshop-ai/argocd-eks` owns
-those Deployments and the Namespace. This work was scoped to tools, so that repository is untouched and the change ships
-as `roboshop-ai-catalog.patch`, against the EKS-only layout of `services/` and `argocd-eks/`. It follows the repository's pattern: a `kustomization.yaml` used only
-by argocd-eks, plus inline patches in each Application. It:
+`roboshop-ai/argocd-eks` owns everything RoboShop-specific. This repository keeps what the whole cluster shares: controllers,
+the `Gateway`, the certificate and Kiali.
 
-- sets `serviceAccountName` on the 10 application Deployments;
-- sets `serviceAccountName` and `appProtocol: tcp` on Redis, RabbitMQ, PostgreSQL and Kafka, and removes MongoDB's sidecar opt-out;
-- declares the `ai-gateway` Service port as TCP;
-- labels the Namespace `istio-injection=enabled`, through the same Application that owns it.
+Istio identity comes from each pod's ServiceAccount, set by inline patches in each Application. Those patches also declare
+`ai-gateway` and the data stores as `appProtocol: tcp`, and label the Namespace `istio-injection=enabled` through the
+Application that owns it.
 
 Argo CD's `managedNamespaceMetadata` looks simpler but is the wrong tool here: it forces
 `sync-options: ServerSideApply=true` onto the Namespace, overwriting the `Prune=false,Delete=false` annotation that protects it.
@@ -249,7 +245,7 @@ python3 -m pytest -q tests/test_eks_ingress.py tests/test_yaml_layout.py
 
 ```bash
 kubectl kustomize eks/roboshop-demo/ingress > /tmp/ingress.yaml
-kubectl kustomize eks/roboshop-demo/mesh > /tmp/mesh.yaml
+kubectl kustomize ../roboshop-ai/argocd-eks/apps/mesh > /tmp/mesh.yaml
 kubeconform -strict -kubernetes-version master -schema-location default \
   -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
   /tmp/ingress.yaml /tmp/mesh.yaml

@@ -12,6 +12,7 @@ import sys
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+APP = Path(os.environ.get('ROBOSHOP_AI_DIR', ROOT.parent / 'roboshop-ai')).resolve()
 CONTROLLERS = (
     ('cert-manager', 'https://charts.jetstack.io', 'v1.20.4', 'cert-manager'),
     ('traefik', 'https://traefik.github.io/charts', '42.0.0', 'traefik'),
@@ -74,7 +75,7 @@ DATA_CLAIMS = ('mongodb-data', 'data-mongodb-0', 'shipping-postgres', 'rabbitmq-
 def ensure_app_secrets(context, accept_new_credentials=False):
     """Create fresh credentials once; existing credentials are never rotated."""
     kube = ['kubectl', '--context', context, '--request-timeout=20s']
-    subprocess.check_call(kube + ['apply', '--server-side', '-f', str(ROOT / 'eks/roboshop/roboshop-ai-namespace.yaml')])
+    subprocess.check_call(kube + ['apply', '--server-side', '-f', str(APP / 'argocd-eks/apps/roboshop/roboshop-ai-namespace.yaml')])
     existing = subprocess.check_output(kube + ['-n', 'roboshop-ai', 'get', 'secret',
         'roboshop-secrets', '--ignore-not-found', '-o', 'json'], text=True)
     if existing.strip():
