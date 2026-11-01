@@ -1,5 +1,5 @@
-# Mesh metrics for Kiali, which needs to query them; the prometheus-agent cannot be queried and only collects node
-# metrics. Short retention, no volume: a restart loses recent traffic graphs and nothing else.
+# Mesh and kube-state metrics that Kiali and the MOKS portal query; the prometheus-agent cannot be queried and only pushes
+# node and kube-state metrics to mk4. Short retention, no volume: a restart loses recent traffic graphs and nothing else.
 alertmanager:
   enabled: false
 kube-state-metrics:
@@ -42,6 +42,23 @@ serverFiles:
       - source_labels:
         - __meta_kubernetes_pod_name
         target_label: pod
+    # Pod, Deployment and node state for the MOKS portal, bounded like the same job in prometheus-agent.yaml.
+    - job_name: kube-state-metrics
+      kubernetes_sd_configs:
+      - role: endpointslice
+        namespaces:
+          names:
+          - kube-state-metrics
+      relabel_configs:
+      - source_labels:
+        - __meta_kubernetes_service_name
+        regex: kube-state-metrics
+        action: keep
+      metric_relabel_configs:
+      - source_labels:
+        - __name__
+        regex: kube_(pod_status_phase|pod_status_ready|pod_container_status_(restarts_total|waiting_reason|last_terminated_reason)|pod_container_resource_(requests|limits)|deployment_(spec_replicas|status_replicas_available)|statefulset_(replicas|status_replicas_ready)|daemonset_status_(desired_number_scheduled|number_ready)|horizontalpodautoscaler_(spec_max_replicas|status_current_replicas|status_desired_replicas)|node_status_(condition|allocatable)|persistentvolumeclaim_status_phase|job_status_failed)
+        action: keep
     - job_name: istiod
       kubernetes_sd_configs:
       - role: endpoints

@@ -56,3 +56,20 @@ serverFiles:
       - source_labels:
         - __meta_kubernetes_pod_node_name
         target_label: node
+    # Bounded to what the dashboards and failure checks read: unfiltered it is 5000 series, as many as everything else here.
+    - job_name: eks-kube-state-metrics
+      kubernetes_sd_configs:
+      - role: endpointslice
+        namespaces:
+          names:
+          - kube-state-metrics
+      relabel_configs:
+      - source_labels:
+        - __meta_kubernetes_service_name
+        regex: kube-state-metrics
+        action: keep
+      metric_relabel_configs:
+      - source_labels:
+        - __name__
+        regex: kube_(pod_status_phase|pod_status_ready|pod_container_status_(restarts_total|waiting_reason|last_terminated_reason)|pod_container_resource_(requests|limits)|deployment_(spec_replicas|status_replicas_available)|statefulset_(replicas|status_replicas_ready)|daemonset_status_(desired_number_scheduled|number_ready)|horizontalpodautoscaler_(spec_max_replicas|status_current_replicas|status_desired_replicas)|node_status_(condition|allocatable)|persistentvolumeclaim_status_phase|job_status_failed)
+        action: keep

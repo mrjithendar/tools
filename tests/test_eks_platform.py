@@ -1,4 +1,5 @@
 """The controllers on roboshop-demo are Argo CD Applications; these keep them adoptable and safe to sync."""
+import re
 from pathlib import Path
 
 import pytest
@@ -75,6 +76,16 @@ def test_kiali_route_matches_its_web_root_and_service():
     route = load(ROOT / 'eks/roboshop-demo/ingress/kiali-virtualservice.yaml')['spec']['http'][0]
     assert route['match'] == [{'uri': {'prefix': load(PLATFORM / 'kiali.yaml')['server']['web_root']}}]
     assert 'rewrite' not in route
+
+
+@pytest.mark.parametrize('values,job', [('prometheus-agent.yaml', 'eks-kube-state-metrics'), ('kiali-prometheus.yaml', 'kube-state-metrics')])
+def test_kube_state_metrics_is_scraped_and_bounded(values, job):
+    jobs = load(PLATFORM / values)['serverFiles']['prometheus.yml']['scrape_configs']
+    keep = next(j for j in jobs if j['job_name'] == job)['metric_relabel_configs'][0]
+    assert keep['action'] == 'keep' and keep['source_labels'] == ['__name__']
+    dashboards = ''.join(p.read_text() for p in (ROOT / 'observability/grafana/dashboards').glob('*.json'))
+    for metric in set(re.findall(r'\bkube_[a-z0-9_]+', dashboards)) - {'kube_namespaces', 'kube_identity'}:
+        assert re.fullmatch(keep['regex'], metric), metric
 
 
 def test_nlb_keeps_only_public_listeners_and_an_explicit_allowlist():
