@@ -33,7 +33,7 @@ class LokiTests(unittest.TestCase):
         middleware=next(d for d in docs if d['kind']=='Middleware' and d['metadata']['name']=='loki-read-auth')
         self.assertEqual(middleware['spec']['basicAuth']['secret'],'loki-read-auth')
         self.assertNotEqual(middleware['spec']['basicAuth']['secret'],'monitoring-auth')
-        project=yaml.safe_load((ROOT/'deploy/minikube/applications/project-logging.yaml').read_text())
+        project=yaml.safe_load((ROOT/'deploy/minikube/applications/project-observability.yaml').read_text())
         allowed={(r['group'],r['kind']) for r in project['spec']['namespaceResourceWhitelist']}
         self.assertLessEqual({('networking.k8s.io','Ingress'),('traefik.io','Middleware')},allowed)
 

@@ -18,7 +18,7 @@ def test_catalog_has_unique_safe_ownership():
     assert not {'moks','catalogue-service','web'} & names
     assert not {'shopping-agent','product-ingestion','jfrog'} & names
     assert not {'argocd','traefik','coredns','kube-proxy','kindnet'}&names
-    assert len(apps)==4  # tools/deploy/minikube/applications; RoboShop is on EKS (roboshop-ai/argocd-eks)
+    assert len(apps)==6  # tools/deploy/minikube/applications; RoboShop is on EKS (roboshop-ai/argocd-eks)
     assert 'cert-manager' not in names
     assert not any(ns=='roboshop-ai' and kind in ('Deployment','StatefulSet') for _,kind,ns,_ in owners)
 
@@ -145,7 +145,7 @@ def test_monitoring_stack_lives_in_tools_catalog():
     assert MONITORING_ARGOCD in CATALOGS and ARGOCD not in CATALOGS
     tools=yaml.safe_load((MONITORING_ARGOCD/'kustomization.yaml').read_text())['resources']
     shop=yaml.safe_load((ARGOCD/'kustomization.yaml').read_text())['resources']
-    moved={'grafana.yaml','prometheus.yaml','loki.yaml','project-logging.yaml'}
+    moved={'grafana.yaml','prometheus.yaml','loki.yaml','otel-collector.yaml','jaeger.yaml','project-observability.yaml'}
     assert moved <= set(tools)
     assert not moved & set(shop)
     assert not any((ARGOCD/name).exists() for name in moved)
@@ -166,4 +166,4 @@ def test_deploy_catalog_holds_only_mk4_apps():
     apps,projects=deploy.catalog()
     assert {'grafana','prometheus','loki'} <= set(apps)
     assert not {'web','moks'} & set(apps)
-    assert {'mk-platform','logging'} <= set(projects)
+    assert {'mk-platform','observability'} <= set(projects)

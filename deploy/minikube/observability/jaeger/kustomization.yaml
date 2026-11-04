@@ -1,4 +1,4 @@
-# kubectl --context mk4 apply -k deploy/minikube/observability/jaeger (no Argo CD Application, see ../README.md)
+# Argo CD Application "jaeger" (../../applications/jaeger.yaml)
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:

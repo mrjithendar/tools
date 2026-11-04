@@ -8,7 +8,7 @@ deploys the Git revision on `master`, so commit and push changes before syncing.
 | Metrics | Prometheus 3.15 | `prometheus` | `monitoring` | [`prometheus/`](prometheus/README.md) (local Helm chart) |
 | Dashboards | Grafana (community chart 14.0.1) | `grafana` | `monitoring` | [`grafana/values.yaml`](grafana/README.md) |
 | Logs | Loki 3.7.9 + Alloy 1.21.2 | `loki` | `monitoring` | [`loki/`](loki/README.md) (Kustomize) |
-| Traces (no Argo CD Application: `kubectl apply -k`) | OpenTelemetry Collector 0.162 → Jaeger 2.22 | none | `observability` | [`otel-collector/`](otel-collector/) (Kustomize), [`jaeger/`](jaeger/) (Kustomize, `jaeger.yaml`), [design notes](opentelemetry/README.md) |
+| Traces | OpenTelemetry Collector 0.162 → Jaeger 2.22 | `otel-collector`, `jaeger` | `observability` | [`otel-collector/`](otel-collector/) (Kustomize), [`jaeger/`](jaeger/) (Kustomize, `jaeger.yaml`), [design notes](opentelemetry/README.md) |
 
 ```bash
 ./deploy-argocd.sh prometheus grafana loki --context mk4
@@ -99,5 +99,5 @@ Alert rules link here (`runbook_url`). jithendar.com's own alerts link to its `w
   (limit 128 MiB in `collector.yaml`); `otelcol_exporter_send_failed_spans` means Jaeger did not accept the batch
   (Jaeger down or restarting). Applications are not affected: they export in the background and drop spans.
 - **JaegerMemoryNearLimit** — lower `max_traces` in `jaeger/jaeger.yaml` or raise the memory limit, then
-  `kubectl apply -k deploy/minikube/observability/jaeger`. Check first that one service is not flooding it:
+  push and sync the `jaeger` Application. Check first that one service is not flooding it:
   `curl localhost:16686/api/v3/services` and recent operations per service.

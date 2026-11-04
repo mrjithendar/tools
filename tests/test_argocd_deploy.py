@@ -88,6 +88,21 @@ def test_destination_moves_are_aligned_and_use_git_namespace():
     assert ops == [{'op': 'add', 'path': '/spec/destination', 'value': git['spec']['destination']}]
 
 
+def test_project_moves_create_git_project_then_align():
+    git = deploy.catalog()[0]['jaeger']
+    stale = json.loads(json.dumps(git))
+    stale['spec']['project'] = 'mk-platform'
+    responses = ['crd', 'crd', json.dumps({'items': [stale]}), '', 'created',
+                 'patched', 'patched', json.dumps({'items': [healthy(git)]})]
+    with patch('sys.argv', ['deploy', 'jaeger']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run:
+        deploy.main()
+    calls = run.call_args_list
+    assert 'appproject' in calls[3].args[0] and 'observability' in calls[3].args[0]
+    assert json.loads(calls[4].kwargs['input'])['metadata']['name'] == 'observability'
+    ops = json.loads(next(c for c in calls if '--type=json' in c.args[0]).kwargs['input'])
+    assert ops == [{'op': 'add', 'path': '/spec/project', 'value': 'observability'}]
+
+
 def test_missing_git_sync_options_added_and_live_extras_kept():
     # Large ConfigMaps need ServerSideApply; a stale live policy must not drop it.
     git = deploy.yaml.safe_load((deploy.MONITORING_ARGOCD / 'cert-manager.yaml').read_text())

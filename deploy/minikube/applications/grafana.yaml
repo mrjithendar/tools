@@ -8,7 +8,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-options: Prune=false,Delete=false
 spec:
-  project: mk-platform
+  project: mk-observability
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

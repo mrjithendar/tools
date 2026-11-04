@@ -31,7 +31,7 @@ def catalog():
 
 
 def source_drift(live, desired):
-    """JSON-patch operations that align a live Application's source and destination with Git.
+    """JSON-patch operations that align a live Application's project, source and destination with Git.
 
     Git owns what an Application deploys and where. Stale include patterns render
     nothing, and a later prune sync would then delete every tracked resource.
@@ -40,6 +40,8 @@ def source_drift(live, desired):
     """
     live_spec, spec = live.get('spec', {}), desired['spec']
     ops = []
+    if live_spec.get('project') != spec['project']:
+        ops.append({'op': 'add', 'path': '/spec/project', 'value': spec['project']})
     for key in ('source', 'sources'):
         if key in spec and live_spec.get(key) != spec[key]:
             ops.append({'op': 'add', 'path': f'/spec/{key}', 'value': spec[key]})
@@ -89,7 +91,7 @@ def main():
         if args.apps == ['install']:
             print(f'Install Argo CD chart {ARGOCD_CHART_VERSION} if absent; reuse existing Helm release. No applications or ingress deployed.')
         else:
-            print('Install Argo CD if missing, create missing projects/apps, align existing app source/destination with Git '
+            print('Install Argo CD if missing, create missing projects/apps, align existing app project/source/destination with Git '
                   '(other settings preserved), sync without pruning, wait for health; apps tracking no resources fail.')
         return
     kube = ['kubectl', '--context', args.context, '--request-timeout=20s', '-n', 'argocd']
@@ -176,14 +178,15 @@ def main():
         namespace_files.add(manifest)
     for manifest in sorted(namespace_files):
         subprocess.check_call(kube + ['apply', '--server-side', '--field-manager=roboshop-namespace-bootstrap', '-f', str(manifest)])
-    for project in sorted({live.get(n, apps[n])['spec']['project'] for n in selected}):
+    # Git's project, since existing apps are moved to it below.
+    for project in sorted({apps[n]['spec']['project'] for n in selected}):
         if not run('get', 'appproject', project, '--ignore-not-found', '-o', 'name').strip():
             print(run('create', '-f', '-', body=projects[project]), end='')
     for name in selected:
         if name not in live:
             print(run('create', '-f', '-', body=apps[name]), end='')
         elif ops := source_drift(live[name], apps[name]):
-            print(f'{name}: aligning live source/destination with Git', flush=True)
+            print(f'{name}: aligning live project/source/destination with Git', flush=True)
             print(run('patch', 'application', name, '--type=json', '--patch-file=/dev/stdin', body=ops), end='')
         # Explicit operation requests must carry the Application's sync options.
         # In particular, fresh namespaces and server-side CRD application depend

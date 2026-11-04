@@ -1,22 +1,23 @@
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
-  name: logging
+  name: observability
   namespace: argocd
 spec:
+  description: mk4 observability stack (Grafana, Prometheus, Loki + Alloy, OpenTelemetry Collector, Jaeger)
   sourceRepos:
-  - https://github.com/mrjithendar/roboshop-ai.git
   - https://github.com/mrjithendar/tools.git
-  - https://github.com/mrjithendar/moks.git
+  - https://grafana-community.github.io/helm-charts
   destinations:
   - namespace: monitoring
     server: https://kubernetes.default.svc
   - namespace: observability
     server: https://kubernetes.default.svc
-  - namespace: traefik
+  # otel-collector's ExternalName Service roboshop-ai/otel-collector, so RoboShop pods can export without a cross-namespace name.
+  - namespace: roboshop-ai
     server: https://kubernetes.default.svc
   clusterResourceWhitelist:
-  # Alloy reads pods and their logs in every namespace.
+  # Alloy reads pods and their logs in every namespace; Prometheus reads nodes for kubelet and cAdvisor.
   - group: rbac.authorization.k8s.io
     kind: ClusterRole
   - group: rbac.authorization.k8s.io
@@ -32,7 +33,7 @@ spec:
     kind: PersistentVolumeClaim
   - group: apps
     kind: Deployment
-  # Loki's authenticated routes: reads for MOKS on EKS, and the push that EKS sends logs through.
+  # Authenticated public routes: Loki reads and pushes, /prometheus, /grafana.
   - group: networking.k8s.io
     kind: Ingress
   - group: traefik.io

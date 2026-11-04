@@ -23,5 +23,15 @@
     "Deployment",
     "monitoring",
     "prometheus"
+  ],
+  [
+    "Deployment",
+    "observability",
+    "jaeger"
+  ],
+  [
+    "Deployment",
+    "observability",
+    "otel-collector"
   ]
 ]

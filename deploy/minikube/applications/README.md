@@ -1,12 +1,17 @@
-# Argo CD catalog: monitoring stack
+# Argo CD catalog: observability stack
 
-Applications for the shared monitoring stack, whose sources live in this repository under `observability/`:
+Applications for the shared observability stack, whose sources live in this repository under `observability/`.
+All five are in the AppProject `observability` (`project-observability.yaml`); `metrics-server` stays in `mk-platform`.
+`deploy.py` creates a missing project and moves an existing Application to the project Git names, but it does not
+update an AppProject that already exists: `kubectl --context mk4 apply -f deploy/minikube/applications/project-observability.yaml`.
 
 | Application | Project | Source | Namespace |
 |---|---|---|---|
-| `grafana` | `mk-platform` | grafana-community chart 14.0.1 + `deploy/minikube/observability/grafana/values.yaml` + `deploy/minikube/observability/grafana/dashboards` | `monitoring` |
-| `prometheus` | `mk-platform` | `deploy/minikube/observability/prometheus` (local chart) | `monitoring` |
-| `loki` (Loki + Alloy) | `logging` (defined here) | `deploy/minikube/observability/loki` | `monitoring` |
+| `grafana` | `observability` | grafana-community chart 14.0.1 + `deploy/minikube/observability/grafana/values.yaml` + `deploy/minikube/observability/grafana/dashboards` | `monitoring` |
+| `prometheus` | `observability` | `deploy/minikube/observability/prometheus` (local chart) | `monitoring` |
+| `loki` (Loki + Alloy) | `observability` | `deploy/minikube/observability/loki` | `monitoring` |
+| `otel-collector` | `observability` | `deploy/minikube/observability/otel-collector` (Kustomize; also the `roboshop-ai/otel-collector` ExternalName Service) | `observability` |
+| `jaeger` | `observability` | `deploy/minikube/observability/jaeger` (Kustomize) | `observability` |
 
 RoboShop runs on EKS: its Applications are in `roboshop-ai/argocd-eks`. `scripts/argocd/deploy.py`
 and `validate.py` read both catalogs together (`scripts/lib/repos.py`: `CATALOGS`), so ownership, project and
@@ -16,7 +21,7 @@ workload-inventory checks still cover the whole cluster; a name defined in both 
 Applications are created or aligned from Git and synced without prune:
 
 ```bash
-python3 scripts/argocd/deploy.py grafana prometheus loki --context mk4   # aligns live specs with Git, then syncs
+python3 scripts/argocd/deploy.py grafana prometheus loki otel-collector jaeger --context mk4   # aligns live specs with Git, then syncs
 python3 scripts/argocd/validate.py --external-charts                     # also run by roboshop-ai's CI daily
 ```
 
