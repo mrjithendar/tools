@@ -166,4 +166,4 @@ def test_deploy_catalog_holds_only_mk4_apps():
     apps,projects=deploy.catalog()
     assert {'grafana','prometheus','loki'} <= set(apps)
     assert not {'web','moks'} & set(apps)
-    assert {'mk-platform','observability'} <= set(projects)
+    assert {'mk-platform','mk-observability'} <= set(projects)

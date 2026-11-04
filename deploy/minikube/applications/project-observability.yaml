@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
-  name: observability
+  name: mk-observability
   namespace: argocd
 spec:
   description: mk4 observability stack (Grafana, Prometheus, Loki + Alloy, OpenTelemetry Collector, Jaeger)

@@ -29,7 +29,7 @@ endpoints on `https://jithendar.com`, behind their own login `loki-read-auth`:
 `query_range`, `labels`, `label/...` and `format_query` under `/loki/api/v1/`. `delete`,
 `tail` and bare `/loki` are not routed, and `push` needs the separate login below. EKS never holds `monitoring-auth`.
 
-Create the Secrets before syncing. The `observability` project needs Ingress and Middleware, and
+Create the Secrets before syncing. The `mk-observability` project needs Ingress and Middleware, and
 `deploy-argocd.sh` does not update an existing AppProject, so apply it too:
 
 ```bash

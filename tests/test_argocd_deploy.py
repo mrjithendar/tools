@@ -97,10 +97,10 @@ def test_project_moves_create_git_project_then_align():
     with patch('sys.argv', ['deploy', 'jaeger']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run:
         deploy.main()
     calls = run.call_args_list
-    assert 'appproject' in calls[3].args[0] and 'observability' in calls[3].args[0]
-    assert json.loads(calls[4].kwargs['input'])['metadata']['name'] == 'observability'
+    assert 'appproject' in calls[3].args[0] and 'mk-observability' in calls[3].args[0]
+    assert json.loads(calls[4].kwargs['input'])['metadata']['name'] == 'mk-observability'
     ops = json.loads(next(c for c in calls if '--type=json' in c.args[0]).kwargs['input'])
-    assert ops == [{'op': 'add', 'path': '/spec/project', 'value': 'observability'}]
+    assert ops == [{'op': 'add', 'path': '/spec/project', 'value': 'mk-observability'}]
 
 
 def test_missing_git_sync_options_added_and_live_extras_kept():
