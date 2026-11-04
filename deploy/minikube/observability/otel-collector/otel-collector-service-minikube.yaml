@@ -12,3 +12,6 @@ spec:
   - name: p4318
     port: 4318
     targetPort: 4318
+  - name: metrics
+    port: 8888
+    targetPort: 8888

@@ -48,9 +48,11 @@ loki.process "safe" {
       raw_error_code = "errorCode", raw_outcome = "outcome", raw_logger = "logger_name",
     }
   }
+  // Routes may be Next.js patterns (/blog/[slug], /api/auth/[...all]); outcome values come from MOKS
+  // (success/failure) and jithendar.com (success/redirect/client_error/server_error/error).
   stage.regex {
     source     = "raw_route"
-    expression = `^(?P<route>/[A-Za-z0-9_./{}:-]{0,150})$`
+    expression = `^(?P<route>/[A-Za-z0-9_./{}:\[\]-]{0,150})$`
   }
   stage.regex {
     source     = "raw_method"
@@ -82,7 +84,7 @@ loki.process "safe" {
   }
   stage.regex {
     source     = "raw_outcome"
-    expression = `^(?P<outcome>success|failure)$`
+    expression = `^(?P<outcome>success|failure|error|redirect|client_error|server_error)$`
   }
   stage.regex {
     source     = "raw_logger"

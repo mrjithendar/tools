@@ -119,9 +119,20 @@ dashboardProviders:
         updateIntervalSeconds: 30
         options:
           path: /var/lib/grafana/dashboards/jithendar
+      - name: moks
+        orgId: 1
+        folder: MOKS
+        type: file
+        disableDeletion: true
+        editable: false
+        allowUiUpdates: false
+        updateIntervalSeconds: 30
+        options:
+          path: /var/lib/grafana/dashboards/moks
 dashboardsConfigMaps:
   roboshop: grafana-dashboards-roboshop
   jithendar: grafana-dashboards-jithendar
+  moks: grafana-dashboards-moks
 
 # Minikube hostPath data lives on this node; move only together with the data.
 nodeSelector:

@@ -1,7 +1,7 @@
 {
   "uid": "jithendar-com-overview",
   "title": "Jithendar.com \u00b7 Overview",
-  "description": "Traffic, errors and latency (from Next.js server spans), site figures and runtime for jithendar.com. Metrics: http://<pod>:9464/metrics (jithendar.com repo, www/src/lib/metrics.ts).",
+  "description": "Traffic, errors and latency (from Next.js server spans), site figures and runtime for jithendar.com. Metrics: http://<pod>:9464/metrics (jithendar.com repo, www/src/lib/metrics.ts). Health probes (/api/health) are left out of request panels.",
   "tags": [
     "jithendar-com",
     "prometheus"
@@ -67,7 +67,7 @@
             "type": "prometheus",
             "uid": "roboshop-prometheus"
           },
-          "expr": "sum(rate(http_server_requests_total{job=\"jithendar-com\"}[5m]))",
+          "expr": "sum(rate(http_server_requests_total{job=\"jithendar-com\", route!=\"/api/health\"}[5m]))",
           "legendFormat": ""
         }
       ],
@@ -120,7 +120,7 @@
             "type": "prometheus",
             "uid": "roboshop-prometheus"
           },
-          "expr": "(sum(rate(http_server_requests_total{job=\"jithendar-com\", status=\"5xx\"}[5m])) or vector(0)) / clamp_min(sum(rate(http_server_requests_total{job=\"jithendar-com\"}[5m])), 1e-9)",
+          "expr": "(sum(rate(http_server_requests_total{job=\"jithendar-com\", route!=\"/api/health\", status=\"5xx\"}[5m])) or vector(0)) / clamp_min(sum(rate(http_server_requests_total{job=\"jithendar-com\", route!=\"/api/health\"}[5m])), 1e-9)",
           "legendFormat": ""
         }
       ],
@@ -181,7 +181,7 @@
             "type": "prometheus",
             "uid": "roboshop-prometheus"
           },
-          "expr": "(sum(rate(http_server_requests_total{job=\"jithendar-com\", status=\"4xx\"}[5m])) or vector(0)) / clamp_min(sum(rate(http_server_requests_total{job=\"jithendar-com\"}[5m])), 1e-9)",
+          "expr": "(sum(rate(http_server_requests_total{job=\"jithendar-com\", route!=\"/api/health\", status=\"4xx\"}[5m])) or vector(0)) / clamp_min(sum(rate(http_server_requests_total{job=\"jithendar-com\", route!=\"/api/health\"}[5m])), 1e-9)",
           "legendFormat": ""
         }
       ],
@@ -242,7 +242,7 @@
             "type": "prometheus",
             "uid": "roboshop-prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"jithendar-com\", route!=\"other\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"jithendar-com\", route!~\"other|/api/health\"}[5m])))",
           "legendFormat": ""
         }
       ],
@@ -416,7 +416,7 @@
             "type": "prometheus",
             "uid": "roboshop-prometheus"
           },
-          "expr": "sum by (status) (rate(http_server_requests_total{job=\"jithendar-com\"}[5m]))",
+          "expr": "sum by (status) (rate(http_server_requests_total{job=\"jithendar-com\", route!=\"/api/health\"}[5m]))",
           "legendFormat": "{{status}}"
         }
       ],
@@ -466,7 +466,7 @@
             "type": "prometheus",
             "uid": "roboshop-prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"jithendar-com\", route!=\"other\"}[5m])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"jithendar-com\", route!~\"other|/api/health\"}[5m])))",
           "legendFormat": "p50"
         },
         {
@@ -475,7 +475,7 @@
             "type": "prometheus",
             "uid": "roboshop-prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"jithendar-com\", route!=\"other\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"jithendar-com\", route!~\"other|/api/health\"}[5m])))",
           "legendFormat": "p95"
         },
         {
@@ -484,7 +484,7 @@
             "type": "prometheus",
             "uid": "roboshop-prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"jithendar-com\", route!=\"other\"}[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{job=\"jithendar-com\", route!~\"other|/api/health\"}[5m])))",
           "legendFormat": "p99"
         }
       ],
@@ -534,7 +534,7 @@
             "type": "prometheus",
             "uid": "roboshop-prometheus"
           },
-          "expr": "sort_desc(sum by (route, method) (increase(http_server_requests_total{job=\"jithendar-com\"}[$__range])))",
+          "expr": "sort_desc(sum by (route, method) (increase(http_server_requests_total{job=\"jithendar-com\", route!=\"/api/health\"}[$__range])))",
           "legendFormat": "",
           "instant": true,
           "range": false
@@ -586,7 +586,7 @@
             "type": "prometheus",
             "uid": "roboshop-prometheus"
           },
-          "expr": "topk(8, histogram_quantile(0.95, sum by (le, route) (rate(http_server_request_duration_seconds_bucket{job=\"jithendar-com\", route!=\"other\"}[10m]))))",
+          "expr": "topk(8, histogram_quantile(0.95, sum by (le, route) (rate(http_server_request_duration_seconds_bucket{job=\"jithendar-com\", route!~\"other|/api/health\"}[10m]))))",
           "legendFormat": "{{route}}"
         }
       ],
@@ -636,7 +636,7 @@
             "type": "prometheus",
             "uid": "roboshop-prometheus"
           },
-          "expr": "sum by (route) (rate(http_server_requests_total{job=\"jithendar-com\", status=\"5xx\"}[5m])) > 0",
+          "expr": "sum by (route) (rate(http_server_requests_total{job=\"jithendar-com\", route!=\"/api/health\", status=\"5xx\"}[5m])) > 0",
           "legendFormat": "{{route}}"
         }
       ],

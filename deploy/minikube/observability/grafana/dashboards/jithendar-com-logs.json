@@ -319,7 +319,7 @@
     },
     {
       "type": "stat",
-      "title": "Request log lines (5m)",
+      "title": "Requests completed (5m)",
       "description": "One line per request seen by the proxy (static assets excluded).",
       "datasource": {
         "type": "loki",
@@ -332,7 +332,7 @@
             "type": "loki",
             "uid": "roboshop-loki"
           },
-          "expr": "sum(count_over_time({namespace=\"jithendar\", container=\"web\"} | logfmt | event=\"http_request\" [5m])) or vector(0)",
+          "expr": "sum(count_over_time({namespace=\"jithendar\", container=\"web\"} | logfmt | event=\"http_request_completed\" [5m])) or vector(0)",
           "queryType": "range"
         }
       ],
@@ -662,6 +662,38 @@
         "w": 24,
         "h": 14
       }
+    },
+    {
+      "id": 14,
+      "type": "logs",
+      "title": "Failed or slow requests (5xx or over 2 s)",
+      "description": "Completion lines (event=http_request_completed). Each has trace_id; open the line to follow the Jaeger link.",
+      "datasource": {
+        "type": "loki",
+        "uid": "roboshop-loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 48
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "roboshop-loki"
+          },
+          "expr": "{namespace=\"jithendar\", container=\"web\"} | logfmt | event=\"http_request_completed\" | status >= 500 or duration_ms > 2000"
+        }
+      ]
     }
   ]
 }

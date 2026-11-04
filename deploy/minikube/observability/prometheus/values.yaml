@@ -16,18 +16,8 @@ remoteWrite:
 # Add Kubernetes-reachable scrape jobs here. Use Kubernetes service DNS names.
 # Only services whose /metrics endpoint answers are listed; files/alerts.yml uses these job names.
 extraScrapeConfigs:
-  - job_name: roboshop
-    metrics_path: /metrics
-    static_configs:
-      - targets:
-          - ai-gateway.roboshop-ai.svc.cluster.local:3000
-          - cart-service.roboshop-ai.svc.cluster.local:4107
-          - catalogue-service.roboshop-ai.svc.cluster.local:4108
-          - currency-service.roboshop-ai.svc.cluster.local:4111
-          - moks.roboshop-ai.svc.cluster.local:4103
-          - payment-service.roboshop-ai.svc.cluster.local:4105
-          - shipping-service.roboshop-ai.svc.cluster.local:4106
-          - user-service.roboshop-ai.svc.cluster.local:4109
+  # RoboShop (roboshop-ai) is not on mk4 since the EKS move; its scrape job and alerts were removed 2026-11-03
+  # because every target was down and RoboShopServiceDown fired forever. Restore both if it comes back.
   # jithendar.com: every site pod, found through the headless Service jithendar-com-metrics (DNS A records),
   # so no Kubernetes API permissions are needed. Port 9464 is cluster-internal (NetworkPolicy in that repo).
   - job_name: jithendar-com
@@ -39,12 +29,31 @@ extraScrapeConfigs:
     relabel_configs:
       - target_label: service
         replacement: jithendar-com
+  # MOKS (namespace moks): api, worker, executor and terminal pods through the headless Service moks-metrics.
+  # The moks NetworkPolicy admits the monitoring namespace on 9464 only. Same block as moks
+  # deploy/grafana/prometheus-scrape.yaml; alerts in files/alerts.yml (groups moks-*).
+  - job_name: moks
+    metrics_path: /metrics
+    dns_sd_configs:
+      - names: ["moks-metrics.moks.svc.cluster.local"]
+        type: A
+        port: 9464
+    relabel_configs:
+      - target_label: service
+        replacement: moks
   - job_name: loki
     static_configs:
       - targets: ["loki.monitoring.svc.cluster.local:3100"]
   - job_name: alloy
     static_configs:
       - targets: ["alloy.monitoring.svc.cluster.local:12345"]
+  # Trace pipeline health: spans accepted/refused/failed by the collector and Jaeger's own receiver and storage.
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector.observability.svc.cluster.local:8888"]
+  - job_name: jaeger
+    static_configs:
+      - targets: ["jaeger.observability.svc.cluster.local:8888"]
 
 # Minikube hostPath data lives on this node; move only together with the data.
 nodeSelector:

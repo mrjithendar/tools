@@ -26,3 +26,13 @@ configMapGenerator:
     disableNameSuffixHash: true
     annotations:
       argocd.argoproj.io/sync-options: ServerSideApply=true
+# MOKS (Grafana folder "MOKS"): copy of the moks repo's deploy/grafana/moks-dashboard.json; edit it there and
+# copy it here. Prometheus job moks and otel-collector, Loki namespace moks.
+- name: grafana-dashboards-moks
+  namespace: monitoring
+  files:
+  - moks-overview.json
+  options:
+    disableNameSuffixHash: true
+    annotations:
+      argocd.argoproj.io/sync-options: ServerSideApply=true

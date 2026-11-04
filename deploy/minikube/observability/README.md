@@ -8,7 +8,7 @@ deploys the Git revision on `master`, so commit and push changes before syncing.
 | Metrics | Prometheus 3.15 | `prometheus` | `monitoring` | [`prometheus/`](prometheus/README.md) (local Helm chart) |
 | Dashboards | Grafana (community chart 14.0.1) | `grafana` | `monitoring` | [`grafana/values.yaml`](grafana/README.md) |
 | Logs | Loki 3.7.9 + Alloy 1.21.2 | `loki` | `monitoring` | [`loki/`](loki/README.md) (Kustomize) |
-| Traces (not deployed: no Argo CD Application) | OpenTelemetry Collector 0.162 → Jaeger 2.22 | none | `observability` | [`otel-collector/`](otel-collector/) (Kustomize), [`jaeger/`](jaeger/), [design notes](opentelemetry/README.md) |
+| Traces (no Argo CD Application: `kubectl apply -k`) | OpenTelemetry Collector 0.162 → Jaeger 2.22 | none | `observability` | [`otel-collector/`](otel-collector/) (Kustomize), [`jaeger/`](jaeger/) (Kustomize, `jaeger.yaml`), [design notes](opentelemetry/README.md) |
 
 ```bash
 ./deploy-argocd.sh prometheus grafana loki --context mk4
@@ -33,7 +33,8 @@ deploys the Git revision on `master`, so commit and push changes before syncing.
   Kustomize turns it into a hash-named ConfigMap, so editing it rolls the collector.
   An `ExternalName` Service `roboshop-ai/otel-collector` keeps pods that still use
   the short name `otel-collector:4318` working; remove it once every RoboShop pod
-  has restarted with the new endpoint. Jaeger storage is in-memory, with no ingress.
+  has restarted with the new endpoint. Jaeger storage is in-memory (`jaeger/jaeger.yaml`, newest 5000 traces),
+  with no ingress. Both expose their own metrics on :8888 (Prometheus jobs `otel-collector`, `jaeger`).
 
 ## Access
 
@@ -83,3 +84,20 @@ Grafana, **Explore → Loki** with `{namespace="roboshop-ai"}` should return lin
 Prometheus (5Gi, 7 days), Grafana (2Gi), Loki (10Gi, 7 days) and Alloy (1Gi
 read positions) use PVCs that are kept when an Application is removed. Jaeger
 traces are lost on restart. This is a single-node lab setup, not HA.
+
+## Runbooks
+
+Alert rules link here (`runbook_url`). jithendar.com's own alerts link to its `www/docs/OBSERVABILITY.md`.
+
+- **ObservabilityTargetDown** — `kubectl --context mk4 -n monitoring get pods` (Loki, Alloy) or `-n observability`
+  (collector, Jaeger). A Jaeger restart empties the trace store; logs and metrics are not affected.
+- **LogShippingDropped** — Alloy gave up on batches after its retries; those lines are gone. `kubectl -n monitoring
+  logs deploy/alloy | grep "dropping data"` shows Loki's answer (on 2026-11-02 it was `500 Ingester is shutting
+  down`); then `kubectl -n monitoring logs deploy/loki`. Restarting Loki is the usual fix; pod logs are still on
+  the nodes for a while, so `kubectl logs` can recover recent lines.
+- **TraceSpansLost** — `otelcol_receiver_refused_spans` means the collector's memory limiter refused data
+  (limit 128 MiB in `collector.yaml`); `otelcol_exporter_send_failed_spans` means Jaeger did not accept the batch
+  (Jaeger down or restarting). Applications are not affected: they export in the background and drop spans.
+- **JaegerMemoryNearLimit** — lower `max_traces` in `jaeger/jaeger.yaml` or raise the memory limit, then
+  `kubectl apply -k deploy/minikube/observability/jaeger`. Check first that one service is not flooding it:
+  `curl localhost:16686/api/v3/services` and recent operations per service.

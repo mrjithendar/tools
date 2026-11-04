@@ -32,6 +32,8 @@ spec:
             memory: 256Mi
         ports:
         - containerPort: 4318
+        - containerPort: 8888
+          name: metrics
         args:
         - --config=/etc/otelcol/config.yaml
         volumeMounts:
