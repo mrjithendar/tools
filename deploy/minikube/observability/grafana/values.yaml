@@ -51,6 +51,11 @@ grafana.ini:
   analytics:
     reporting_enabled: false
     check_for_updates: false
+  # Jaeger 2.x serves only /api/v3. With this toggle the Jaeger data source uses it for trace-by-id, services and
+  # operations; its Search and dependency graph still call the removed /api/* and fail (dashboards find traces
+  # through Loki's trace_id instead). Experimental in Grafana 13.2.
+  feature_toggles:
+    enable: jaegerEnableGrpcEndpoint
 readinessProbe:
   httpGet:
     path: /grafana/api/health
@@ -84,14 +89,38 @@ datasources:
         editable: false
         jsonData:
           maxLines: 1000
-          # Log lines carry trace_id=<32 hex>; the link opens it in Jaeger's UI, which is not exposed publicly:
-          # kubectl -n observability port-forward svc/jaeger 16686 first. (Jaeger 2.x has no legacy /api/*,
-          # which Grafana's Jaeger data source needs, so there is no Jaeger data source.)
+          # Log lines carry trace_id=<32 hex>. TraceID opens the trace in Grafana (Jaeger data source below);
+          # TraceID (Jaeger UI) opens Jaeger's own UI, which is not public: kubectl -n observability
+          # port-forward svc/jaeger 16686 first.
           derivedFields:
             - name: TraceID
               matcherRegex: "trace_id=([0-9a-f]{32})"
-              url: "http://localhost:16686/trace/$${__value.raw}"  # $$ escapes Grafana's env-var expansion
-              urlDisplayLabel: "Open trace in Jaeger (port-forward)"
+              datasourceUid: jaeger
+              url: "$${__value.raw}"  # the query for the Jaeger data source; $$ escapes Grafana's env-var expansion
+              urlDisplayLabel: "View trace"
+            - name: TraceID (Jaeger UI)
+              matcherRegex: "trace_id=([0-9a-f]{32})"
+              url: "http://localhost:16686/trace/$${__value.raw}"
+              urlDisplayLabel: "Open in Jaeger UI (port-forward)"
+      # Traces from the OpenTelemetry collector (services jithendar-com, moks-worker). Needs the
+      # jaegerEnableGrpcEndpoint toggle above; no NetworkPolicy in observability, so Grafana reaches it directly.
+      - name: Jaeger
+        uid: jaeger
+        type: jaeger
+        access: proxy
+        url: http://jaeger.observability.svc.cluster.local:16686
+        isDefault: false
+        editable: false
+        jsonData:
+          nodeGraph:
+            enabled: true
+          # Span → log lines of the same trace. Every app that logs trace_id writes it as trace_id=<hex>.
+          tracesToLogsV2:
+            datasourceUid: roboshop-loki
+            spanStartTimeShift: "-5m"
+            spanEndTimeShift: "5m"
+            customQuery: true
+            query: '{namespace=~"jithendar|moks"} |= "trace_id=$${__trace.traceId}"'
 
 # RoboShop dashboards live in deploy/minikube/observability/grafana/dashboards and arrive as the
 # grafana-dashboards-roboshop ConfigMap (third source of the grafana Application).

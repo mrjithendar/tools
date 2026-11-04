@@ -152,10 +152,14 @@ def test_monitoring_stack_lives_in_tools_catalog():
     # Their workloads are required by the tools inventory, not roboshop-ai's.
     monitoring={tuple(r) for r in json.loads((MONITORING_ARGOCD/'workload-inventory.json').read_text())}
     assert {('Deployment','monitoring',n) for n in ('alloy','grafana','loki','prometheus')} <= monitoring
-    # Every monitoring app reads its sources from tools.git (or a pinned chart repository).
+    # Every monitoring app reads its sources from tools.git (or a pinned chart repository). The one exception:
+    # grafana reads the jithendar.com dashboards from that repo's grafana/ folder.
     for doc in module.catalog():
         if doc['kind']=='Application' and doc['metadata']['name'] in ('grafana','prometheus','loki'):
             for source in doc['spec'].get('sources',[doc['spec'].get('source')]):
+                if source['repoURL']=='https://github.com/mrjithendar/jithendar.com.git':
+                    assert doc['metadata']['name']=='grafana' and source.get('path')=='grafana',source
+                    continue
                 assert source['repoURL'].startswith(('https://github.com/mrjithendar/tools.git','https://grafana-community.github.io/')),source
 
 

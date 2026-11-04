@@ -8,6 +8,8 @@ spec:
   sourceRepos:
   - https://github.com/mrjithendar/tools.git
   - https://grafana-community.github.io/helm-charts
+  # grafana/ folder: the jithendar.com dashboards (ConfigMap only; see namespaceResourceWhitelist).
+  - https://github.com/mrjithendar/jithendar.com.git
   destinations:
   - namespace: monitoring
     server: https://kubernetes.default.svc

@@ -17,13 +17,21 @@ groups:
         annotations:
           summary: 'Alloy dropped {{ $value | humanize }} log lines in 15 min; they are lost'
           runbook_url: 'https://github.com/mrjithendar/tools/blob/master/deploy/minikube/observability/README.md#runbooks'
+      # One rate() per counter, told apart by `reason`: refused and failed have identical labels, so a single
+      # rate() over both answered "vector cannot contain metrics with the same labelset" and this rule never ran
+      # (seen in Prometheus → Rules on 2026-11-04).
       - alert: TraceSpansLost
-        expr: sum by (job) (rate({__name__=~"otelcol_exporter_send_failed_spans(_total)?|otelcol_receiver_(refused|failed)_spans(_total)?", job=~"otel-collector|jaeger"}[10m])) > 0
+        expr: >-
+          sum by (job, reason) (
+            label_replace(rate({__name__=~"otelcol_receiver_refused_spans(_total)?", job=~"otel-collector|jaeger"}[10m]), "reason", "refused", "", "")
+            or label_replace(rate({__name__=~"otelcol_receiver_failed_spans(_total)?", job=~"otel-collector|jaeger"}[10m]), "reason", "failed", "", "")
+            or label_replace(rate({__name__=~"otelcol_exporter_send_failed_spans(_total)?", job=~"otel-collector|jaeger"}[10m]), "reason", "send_failed", "", "")
+          ) > 0
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: '{{ $labels.job }} is refusing or failing to export spans'
+          summary: '{{ $labels.job }} is losing spans ({{ $labels.reason }})'
           runbook_url: 'https://github.com/mrjithendar/tools/blob/master/deploy/minikube/observability/README.md#runbooks'
       # Jaeger keeps traces in memory; an OOM kill loses all of them.
       - alert: JaegerMemoryNearLimit

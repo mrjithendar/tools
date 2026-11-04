@@ -67,7 +67,11 @@ class LokiTests(unittest.TestCase):
     def test_datasource_preserves_prometheus(self):
         cfg=yaml.safe_load((ROOT/'deploy/minikube/observability/grafana/values.yaml').read_text())
         ds=cfg['datasources']['datasources.yaml']['datasources']
-        self.assertEqual({d['type'] for d in ds},{'prometheus','loki'})
+        self.assertEqual({d['type'] for d in ds},{'prometheus','loki','jaeger'})
         self.assertEqual([d['type'] for d in ds if d['isDefault']],['prometheus'])
+        # Jaeger 2.x has only /api/v3; Grafana's Jaeger data source uses it only with this toggle.
+        self.assertIn('jaegerEnableGrpcEndpoint',cfg['grafana.ini']['feature_toggles']['enable'])
+        loki=next(d for d in ds if d['type']=='loki')
+        self.assertIn('jaeger',[f.get('datasourceUid') for f in loki['jsonData']['derivedFields']])
 
 if __name__=='__main__':unittest.main()
