@@ -17,11 +17,19 @@ providers:
 service:
   spec:
     type: NodePort
+# The host's HAProxy (../expose-ingress.sh) sends the PROXY protocol, so Traefik sees each visitor's real IP
+# instead of the node's (kube-proxy rewrites the source of NodePort traffic). Only the minikube Docker network
+# is trusted to send the header; connections without it are still accepted. Roll out this first, then
+# HAProxy: the other way round, Traefik would reject every connection.
 ports:
   web:
     nodePort: 30080
+    proxyProtocol:
+      trustedIPs: ["192.168.49.0/24"]
   websecure:
     nodePort: 30443
+    proxyProtocol:
+      trustedIPs: ["192.168.49.0/24"]
 # HTTP stays available for cert-manager's HTTP-01 challenges.
 # Grafana's own Ingress is HTTPS-only. The dashboard is not exposed.
 ingressRoute:

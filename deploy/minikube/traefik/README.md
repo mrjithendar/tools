@@ -75,3 +75,13 @@ See [Grafana](../monitoring/grafana/README.md) and [cert-manager](../cert-manage
 
 Traefik publishes `jithendar.com` as the ingress status hostname. The NodePort service has no load-balancer address, so copying its status would leave ingresses permanently Progressing in Argo CD. If the public hostname changes, update `providers.kubernetesIngress.ingressEndpoint.hostname` in `values.yaml`.
 
+
+## Real client IPs (PROXY protocol)
+
+HAProxy sends a PROXY protocol v2 header and Traefik trusts it from `192.168.49.0/24` (the minikube Docker network),
+so `X-Forwarded-For`, Traefik's `ipAllowList` and the apps' logs see the visitor's address instead of the node's.
+Order matters: `deploy-traefik.sh` first (Traefik then accepts connections with or without the header), then
+`expose-ingress.sh` on the host (it refuses to run until Traefik accepts the header). To undo, reverse the order:
+remove `send-proxy-v2` and rerun `expose-ingress.sh`, then remove `proxyProtocol` and rerun `deploy-traefik.sh`.
+Anything that can reach a node's NodePort from inside the minikube network could also send a forged header, so an
+IP allowlist is one layer, never the only one.
