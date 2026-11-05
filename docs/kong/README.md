@@ -4,6 +4,11 @@ Status on 2026-11-05: **prepared, not deployed.** Nothing was applied, synced, c
 migration works can only be confirmed by you, after deploying and checking traffic (06). Validation that was
 possible offline is below; everything else is under "Unverified".
 
+Later on 2026-11-05: Kong is no longer an Argo CD Application. `deploy/minikube/kong` is a local Helm chart (the same
+20 manifests, now in `templates/`) installed by Terraform (`minikube-infrastructure/kong.tf`), like
+metrics-server, cert-manager and Argo CD. The Application `kong` and AppProject `mk-gateway` were removed. Runbook
+steps P7 and 3–5 changed accordingly.
+
 | Document | Contents |
 |---|---|
 | [00-discovery.md](00-discovery.md) | Traefik inventory, TLS, traffic path, GitOps, secrets, storage, capacity, PostgreSQL |
@@ -34,7 +39,7 @@ Cloudflare DNS (DNS only) ─▶ host 46.224.38.14 ─▶ HAProxy (TCP, PROXY v2
 
 | Layer | Owner | Tool |
 |---|---|---|
-| Namespace, PostgreSQL/Kong workloads, Services, PVC, NetworkPolicies, bootstrap Job, Certificates in `kong` | Git (`tools/deploy/minikube/kong`) | Argo CD `kong`, manual sync, no prune |
+| Namespace, PostgreSQL/Kong workloads, Services, PVC, NetworkPolicies, bootstrap Job, Certificates in `kong` | Git (`tools/deploy/minikube/kong`, local Helm chart) | Terraform release `kong` (`minikube-infrastructure/kong.tf`), by hand |
 | Kong Services, Routes, Upstreams, Plugins, Consumers | Kong's database | Kong Manager / Admin API |
 | Kong Certificates/SNIs (two, fixed ids) | cert-sync sidecar, exclusively | the only automation that writes Kong entities |
 | Initial seed | Git, reference copy (`kong-config/seed/kong.yaml`) | decK, once, by hand |
@@ -235,4 +240,5 @@ Merging jithendar.com's branch to `master` triggers its CI deploy (NetworkPolici
 9. RoboShop on mk4: the route is ready (08), but running RoboShop there (Argo apps for mk4, no Istio, data
    stores, real client IPs in web's nginx) is a separate project. Want it, and should the 33 stale
    `roboshop-demo-*` Applications be removed?
-10. Helm reports `traefik` revision 2 as failed and `argocd` as pending-install; worth a separate look.
+10. Helm reports `traefik` revision 2 as failed; `argocd`'s pending-install is cleared when Terraform takes over
+    Argo CD (`minikube-infrastructure/README.md`, steps 3–4).

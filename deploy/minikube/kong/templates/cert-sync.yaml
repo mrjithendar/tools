@@ -15,8 +15,6 @@ metadata:
   labels:
     app.kubernetes.io/name: kong-cert-sync
     app.kubernetes.io/part-of: kong-gateway
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
 data:
   cert_sync.py: |
     """Upload cert-manager certificates to Kong's Admin API when they change. Standard library only."""

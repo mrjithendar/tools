@@ -1,7 +1,7 @@
 # Kong Gateway OSS on mk4 (database mode)
 
-Infrastructure only: Argo CD Application `kong` (`../applications/kong.yaml`, project `mk-gateway`) syncs this
-folder by hand, never with prune. Routes, plugins and consumers are **not** here: they live in Kong's PostgreSQL
+Infrastructure only: a local Helm chart (`Chart.yaml`, manifests in `templates/`, no values), installed by
+Terraform as the release `kong` (`../../../minikube-infrastructure/kong.tf`). Routes, plugins and consumers are **not** here: they live in Kong's PostgreSQL
 database and are managed in Kong Manager. Start with [`docs/kong/README.md`](../../../docs/kong/README.md).
 
 | File | What |
@@ -15,6 +15,8 @@ database and are managed in Kong Manager. Start with [`docs/kong/README.md`](../
 | `*-networkpolicy.yaml` | default deny plus the allowed flows |
 | `*-certificate.yaml` | cert-manager Certificates for Kong (DNS-01 issuer) |
 | `create-secrets.sh` | Secret `kong-postgres`, once, by a person |
-| `upgrade/` | `migrations up` / `finish` Job templates, applied by hand during an upgrade; not in the kustomization |
+| `upgrade/` | `migrations up` / `finish` Job templates, applied by hand during an upgrade; not in the chart (`.helmignore`) |
 
-The namespace manifest is `../namespaces/kong.yaml`, like every app in this catalog.
+Every row but the last two is in `templates/`. The namespace is created by `create-secrets.sh`, which must run before
+the first `terraform apply` (the pods need its Secret); `../namespaces/kong.yaml` still lists it for the ECR
+pull-secret refresh. Render the chart with `helm template kong deploy/minikube/kong -n kong`.

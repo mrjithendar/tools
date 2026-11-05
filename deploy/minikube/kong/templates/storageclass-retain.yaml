@@ -12,8 +12,8 @@ metadata:
   labels:
     app.kubernetes.io/part-of: kong-gateway
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
-    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+    # helm uninstall (or terraform destroy) leaves this object in place.
+    helm.sh/resource-policy: keep
 provisioner: k8s.io/minikube-hostpath
 reclaimPolicy: Retain
 volumeBindingMode: Immediate

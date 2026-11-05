@@ -104,20 +104,20 @@ def test_project_moves_create_git_project_then_align():
 
 
 def test_missing_git_sync_options_added_and_live_extras_kept():
-    # Large ConfigMaps need ServerSideApply; a stale live policy must not drop it.
-    git = deploy.yaml.safe_load((deploy.MONITORING_ARGOCD / 'cert-manager.yaml').read_text())
+    # Fresh namespaces need CreateNamespace; a stale live policy must not drop it.
+    git = deploy.catalog()[0]['prometheus']
     stale = json.loads(json.dumps(git))
     stale['spec']['syncPolicy'] = {'syncOptions': ['FailOnSharedResource=true', 'RespectIgnoreDifferences=true'],
                                    'retry': {'limit': 2}}
-    responses = ['crd', 'crd', json.dumps({'items': [stale]}), 'appproject/mk-platform',
+    responses = ['crd', 'crd', json.dumps({'items': [stale]}), 'appproject/mk-observability',
                  'patched', 'patched', json.dumps({'items': [healthy(git)]})]
-    with patch('sys.argv', ['deploy', 'cert-manager']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run:
+    with patch('sys.argv', ['deploy', 'prometheus']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run:
         deploy.main()
     patches = [c for c in run.call_args_list if 'patch' in c.args[0]]
     policy = json.loads(patches[0].kwargs['input'])[-1]
     assert policy['path'] == '/spec/syncPolicy' and policy['value']['retry'] == {'limit': 2}
     assert policy['value']['syncOptions'][:2] == ['FailOnSharedResource=true', 'RespectIgnoreDifferences=true']
-    assert 'ServerSideApply=true' in policy['value']['syncOptions']
+    assert 'CreateNamespace=true' in policy['value']['syncOptions']
     sync = json.loads(patches[1].kwargs['input'])['operation']['sync']
     assert sync['syncOptions'] == policy['value']['syncOptions']
 
@@ -164,119 +164,47 @@ def test_default_and_all_include_entire_catalog(arguments, capsys):
 
 def test_status_missing_crd_has_actionable_error_without_mutation():
     with patch('sys.argv', ['deploy', 'status']), patch.object(deploy.subprocess, 'check_output', return_value='') as run:
-        with pytest.raises(RuntimeError, match='deploy-argocd.sh'):
+        with pytest.raises(RuntimeError, match='terraform -chdir=minikube-infrastructure apply'):
             deploy.main()
     assert len(run.call_args_list) == 1
     assert 'get' in run.call_args.args[0]
 
 
-def test_install_preview_is_offline():
-    with patch('sys.argv', ['deploy', 'install', '--dry-run']), patch.object(deploy.subprocess, 'check_output') as read, patch.object(deploy.subprocess, 'check_call') as write:
-        deploy.main()
+def test_install_is_refused_in_favour_of_terraform():
+    with patch('sys.argv', ['deploy', 'install']), patch.object(deploy.subprocess, 'check_output') as read:
+        with pytest.raises(SystemExit):
+            deploy.main()
     read.assert_not_called()
-    write.assert_not_called()
 
 
-def test_fresh_install_uses_pinned_chart_and_absolute_values():
-    with patch('sys.argv', ['deploy', 'install', '--context', 'fresh']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=['  -A, --all-namespaces list across namespaces', '[]', '', 'established', 'established']), patch.object(deploy.subprocess, 'check_call') as write:
-        deploy.main()
-    command=write.call_args.args[0]
-    assert 'fresh' in command
-    assert deploy.ARGOCD_CHART_VERSION in command
-    assert str(deploy.ROOT / 'deploy/minikube/argocd/values.yaml') in command
-    assert '--wait' in command
-    assert command[command.index('--repo') + 1] == 'https://argoproj.github.io/argo-helm'
-    assert not any(arg.startswith('oci://') for arg in command)
-
-
-def test_install_reuses_existing_release_without_upgrade():
-    with patch('sys.argv', ['deploy', 'install']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=['  -a, --all show all releases', '[{"status":"deployed"}]', 'established', 'established']), patch.object(deploy.subprocess, 'check_call') as write:
-        deploy.main()
-    write.assert_not_called()
-
-
-def test_install_does_not_adopt_unmanaged_crds():
-    with patch('sys.argv', ['deploy', 'install']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=['', '[]', 'crd/applications']), patch.object(deploy.subprocess, 'check_call') as write:
-        with pytest.raises(RuntimeError, match='Refusing automatic adoption'):
+def test_missing_argocd_stops_application_sync_without_installing():
+    with patch('sys.argv', ['deploy', 'loki', '--context', 'fresh']), patch.object(deploy.subprocess, 'check_output', return_value='') as read, patch.object(deploy.subprocess, 'check_call') as write:
+        with pytest.raises(RuntimeError, match='Install it with Terraform first'):
             deploy.main()
     write.assert_not_called()
-
-
-@pytest.mark.parametrize('help_text,uses_all', [
-    ('  -a, --all show all releases', True),
-    ('      --all show all releases', True),
-    ('  -A, --all-namespaces list all namespaces', False),
-])
-def test_helm_list_version_compatibility_and_pending_release(help_text, uses_all):
-    with patch('sys.argv', ['deploy', 'install']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=[help_text, '[{"status":"pending-upgrade"}]']) as read, patch.object(deploy.subprocess, 'check_call') as write:
-        with pytest.raises(RuntimeError, match='not deployed'):
-            deploy.main()
-    command = read.call_args_list[1].args[0]
-    assert ('--all' in command) == uses_all
-    assert '--namespace' in command
-    assert '--all-namespaces' not in command
-    write.assert_not_called()
-
-
-def test_missing_controller_installed_before_application_sync():
-    healthy = {'metadata': {'name': 'loki'}, 'spec': {'project': 'mk-platform'},
-               'status': {'operationState': {'phase': 'Succeeded'},
-                          'sync': {'status': 'Synced'}, 'health': {'status': 'Healthy'},
-                          'resources': [{'kind': 'Deployment', 'name': 'loki'}]}}
-    responses = ['', '--all-namespaces', '[]', '', 'established', 'established',
-                 '{"items":[]}', 'appproject/mk-platform', 'created', 'patched',
-                 json.dumps({'items': [healthy]})]
-    with patch('sys.argv', ['deploy', 'loki', '--context', 'fresh']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as read, patch.object(deploy.subprocess, 'check_call') as install:
-        deploy.main()
-    assert len([c for c in install.call_args_list if c.args[0][0] == 'helm']) == 1
-    assert all('fresh' in c.args[0] for c in install.call_args_list)
-    assert any('patch' in call.args[0] for call in read.call_args_list)
-
-
-def test_failed_automatic_install_never_deploys_apps():
-    with patch('sys.argv', ['deploy', 'loki']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=['', '', '[]', '']) as read, patch.object(deploy.subprocess, 'check_call', side_effect=deploy.subprocess.CalledProcessError(1, 'helm')):
-        with pytest.raises(deploy.subprocess.CalledProcessError):
-            deploy.main()
     assert not any('patch' in call.args[0] or 'create' in call.args[0] for call in read.call_args_list)
 
 
 @pytest.mark.parametrize('existing', [False, True])
-def test_cert_manager_sync_carries_namespace_and_ssa_options(existing):
-    app = deploy.yaml.safe_load((deploy.MONITORING_ARGOCD / 'cert-manager.yaml').read_text())
+def test_sync_carries_namespace_options(existing):
+    app = json.loads(json.dumps(deploy.catalog()[0]['prometheus']))
     options = app['spec']['syncPolicy']['syncOptions']
     if existing:
         options.append('RespectIgnoreDifferences=true')
     app['status'] = {'operationState': {'phase': 'Succeeded'},
                      'sync': {'status': 'Synced'}, 'health': {'status': 'Healthy'},
-                     'resources': [{'kind': 'Deployment', 'name': 'loki'}]}
-    responses = ['crd/applications', 'crd/appprojects', json.dumps({'items': [app] if existing else []}), 'appproject/mk-platform']
+                     'resources': [{'kind': 'Deployment', 'name': 'prometheus'}]}
+    responses = ['crd/applications', 'crd/appprojects', json.dumps({'items': [app] if existing else []}), 'appproject/mk-observability']
     if not existing:
         responses.append('created')
     responses += ['patched', json.dumps({'items': [app]})]
-    with patch('sys.argv', ['deploy', 'cert-manager']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run:
+    with patch('sys.argv', ['deploy', 'prometheus']), patch.object(deploy.subprocess, 'check_output', side_effect=responses) as run:
         deploy.main()
     call = next(c for c in run.call_args_list if 'patch' in c.args[0])
     sync = json.loads(call.kwargs['input'])['operation']['sync']
     assert sync['syncOptions'] == options
     assert 'CreateNamespace=true' in sync['syncOptions']
-    assert 'ServerSideApply=true' in sync['syncOptions']
     assert sync['prune'] is False
-
-
-def test_pending_install_reused_only_after_workload_and_crd_checks():
-    with patch('sys.argv', ['deploy', 'install']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=['', '[{"status":"pending-install"}]'] + ['ready'] * 6) as read, patch.object(deploy.subprocess, 'check_call') as write:
-        deploy.main()
-    commands = [c.args[0] for c in read.call_args_list]
-    assert len([c for c in commands if 'rollout' in c]) == 4
-    assert len([c for c in commands if 'wait' in c]) == 2
-    write.assert_not_called()
-
-
-def test_unhealthy_pending_install_stops_without_release_mutation():
-    with patch('sys.argv', ['deploy', 'install']), patch.object(deploy.shutil, 'which', return_value='/bin/helm'), patch.object(deploy.subprocess, 'check_output', side_effect=['', '[{"status":"pending-install"}]', deploy.subprocess.CalledProcessError(1, 'kubectl')]), patch.object(deploy.subprocess, 'check_call') as write:
-        with pytest.raises(deploy.subprocess.CalledProcessError):
-            deploy.main()
-    write.assert_not_called()
 
 
 def test_namespace_applied_before_sync_and_deduplicated():

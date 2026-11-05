@@ -1,10 +1,9 @@
 # `kong migrations bootstrap`, once. How repeat and concurrent runs are prevented:
 #
-#   1. Not an Argo CD hook. Hooks (PreSync/Sync) are created again on every sync; this is an ordinary resource,
-#      so Argo CD creates it only when it is missing and otherwise just compares it. A completed Job is not
-#      re-run by a sync.
-#   2. No ttlSecondsAfterFinished: if Kubernetes deleted the finished Job, Argo CD would see it missing and
-#      create it again on the next sync.
+#   1. Not a Helm hook. Hooks are created again on every install/upgrade; this is an ordinary resource of the
+#      release (minikube-infrastructure/kong.tf), so Helm creates it once and leaves an unchanged Job alone on
+#      later upgrades. A completed Job is not re-run by `terraform apply`.
+#   2. No ttlSecondsAfterFinished: if Kubernetes deleted the finished Job, the next upgrade would create it again.
 #   3. The name carries the Kong version. A Job's pod template is immutable, so an upgrade cannot quietly reuse
 #      this Job; upgrades use upgrade/migrations-up-job.yaml and upgrade/migrations-finish-job.yaml, by hand.
 #   4. parallelism 1 / completions 1, and Kong itself: bootstrap takes the database cluster mutex
@@ -21,10 +20,6 @@ metadata:
     app.kubernetes.io/name: kong-migrations
     app.kubernetes.io/part-of: kong-gateway
     app.kubernetes.io/version: "3.9.4"
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-    # Pruning this Job would let the next sync create it again.
-    argocd.argoproj.io/sync-options: Prune=false
 spec:
   parallelism: 1
   completions: 1

@@ -1,0 +1,4 @@
+# Applied by hand during an upgrade (docs/kong/05-backup-restore.md), never by the release.
+upgrade/
+create-secrets.sh
+README.md

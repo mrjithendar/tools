@@ -1,7 +1,7 @@
-> Deployment-script cleanup: imperative application deployment commands in this
-> document are retired. Use the Argo CD catalog and the five supported commands
-> documented in `docs/operations/scripts.md`. Historical examples below are not
-> runnable deployment instructions.
+> Installed by Terraform as a Helm release: [`../../../minikube-infrastructure/argocd.tf`](../../../minikube-infrastructure/argocd.tf), with
+> `values.yaml` from this folder. Apply with
+> `terraform -chdir=minikube-infrastructure apply -var-file=vars/mk4.tfvars`, or by CI on master
+> ([`../../../minikube-infrastructure/README.md`](../../../minikube-infrastructure/README.md)). The script commands below are historical.
 
 # Argo CD at https://jithendar.com/argocd/
 

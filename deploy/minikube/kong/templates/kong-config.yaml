@@ -9,8 +9,6 @@ metadata:
   labels:
     app.kubernetes.io/name: kong
     app.kubernetes.io/part-of: kong-gateway
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
 data:
   KONG_DATABASE: postgres
   KONG_PG_HOST: kong-postgres.kong.svc.cluster.local

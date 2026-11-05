@@ -146,8 +146,8 @@ nodes needed. With one node the window is short, but the order still matters.
 3. `sed 's/NEW_VERSION/3.9.5/g' deploy/minikube/kong/upgrade/migrations-up-job.yaml | kubectl --context mk4 apply -f -`
    and `kubectl --context mk4 -n kong wait --for=condition=complete job/kong-migrations-up-3.9.5 --timeout=600s`.
    Kong's migration mutex stops a second run; `up` exits when another node holds it.
-4. In Git, change `kong:3.9.4` to `kong:3.9.5` in `kong-deployment.yaml` (and the init container), push, sync the
-   `kong` Application (no prune). The init container accepts exit 4 (`finish` pending).
+4. Change `kong:3.9.4` to `kong:3.9.5` in `templates/kong-deployment.yaml` (and the init container), then
+   `terraform -chdir=minikube-infrastructure apply -var-file=vars/mk4.tfvars` (or push; CI applies). The init container accepts exit 4 (`finish` pending).
 5. Verify (06 step 8).
 6. `sed 's/NEW_VERSION/3.9.5/g' deploy/minikube/kong/upgrade/migrations-finish-job.yaml | kubectl --context mk4 apply -f -`
    and wait for completion. After `finish`, the old version cannot run against this database: rollback from here

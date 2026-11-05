@@ -12,8 +12,6 @@ metadata:
   namespace: kong
   labels:
     app.kubernetes.io/part-of: kong-gateway
-  annotations:
-    argocd.argoproj.io/sync-wave: "2"
 spec:
   secretName: jithendar-com-tls
   dnsNames:

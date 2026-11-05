@@ -1,13 +1,15 @@
 # Minikube (`mk4`)
 
-The self-hosted cluster: Argo CD hub, Traefik, cert-manager and the monitoring stack. Every path below is from the repository root. Everything here stays on `mk4`; AWS resources belong in [`../eks`](../eks/).
+The self-hosted cluster: Argo CD hub, Traefik, cert-manager, Kong and the monitoring stack. Every path below is from the repository root. Everything here stays on `mk4`; AWS resources belong in [`../eks`](../eks/).
 
 | Path | Contents | Applied by |
 |---|---|---|
 | `install.sh`, `kubeconfig.sh`, `expose-ingress.sh`, `tunnel-endpoint.sh`, `host-limits.sh`, `reset.sh` | Cluster lifecycle | Root wrappers or directly |
-| `applications/` | Argo CD catalog: AppProjects, Grafana, Prometheus, Loki, metrics-server | `./deploy-argocd.sh` |
+| [`../../minikube-infrastructure/`](../../minikube-infrastructure/README.md) | Terraform root: Helm releases for metrics-server, cert-manager, Argo CD and Kong, one `.tf` file each | `terraform -chdir=minikube-infrastructure apply` |
+| `applications/` | Argo CD catalog: AppProjects, Grafana, Prometheus, Loki, OpenTelemetry Collector, Jaeger | `./deploy-argocd.sh` |
 | `observability/` | Prometheus chart, Grafana values and dashboards, Loki and Alloy, OpenTelemetry collector, Jaeger | Argo CD, through `applications/` |
-| `argocd/`, `cert-manager/`, `traefik/`, `metrics-server/`, `namespaces/` | Controller values and manifests | `./bootstrap-cluster.sh`, Argo CD |
+| `argocd/`, `cert-manager/`, `metrics-server/`, `kong/` | Values and the local Kong chart for the Terraform releases; Argo CD's Traefik Ingress | `minikube-infrastructure/`; the Ingress by `./bootstrap-cluster.sh` |
+| `traefik/`, `namespaces/` | Traefik values, namespace manifests | `./bootstrap-cluster.sh`, `./deploy-argocd.sh` |
 | `vault/`, `jfrog/`, `ecr-refresh/` | Optional components | Their own scripts and READMEs |
 | `examples/` | Templates. Nothing applies them. | By hand |
 
@@ -22,7 +24,9 @@ Docker, `kubectl` and Helm (`./init.sh --profile minikube`), AWS credentials tha
 ```bash
 ./init.sh --profile minikube
 ./deploy-minikube.sh                        # create or update the cluster
-./bootstrap-cluster.sh --context mk4        # cert-manager, Traefik, Argo CD and its ingress, ECR pull secrets
+terraform -chdir=minikube-infrastructure init
+terraform -chdir=minikube-infrastructure apply -var-file=vars/mk4.tfvars   # or CI; Kong stays off until its cutover
+./bootstrap-cluster.sh --context mk4        # checks those releases; Traefik, Argo CD's ingress, ECR pull secrets
 ./create-secrets.sh --context mk4 --apply   # missing credentials; never rotates existing ones
 ./deploy-argocd.sh --context mk4            # align and sync the catalog, without prune
 ```

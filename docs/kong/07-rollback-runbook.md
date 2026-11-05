@@ -23,8 +23,10 @@ Goal: traffic back on Traefik, Kong scaled to zero, **no Kong or PostgreSQL data
 | 5 | Scale Kong to zero (keeps PostgreSQL, the PVC and every entity): `$K -n kong scale deploy/kong --replicas=0` | `$K -n kong get deploy kong -o jsonpath='{.spec.replicas}'`; `$K -n kong get pvc kong-postgres-data` | `0`; `Bound` |
 | 6 | Optional: keep PostgreSQL running (no traffic) or scale it too: `$K -n kong scale sts/kong-postgres --replicas=0` | `$K get pv \| grep kong-postgres-data` | PV `Bound`/`Released` with `Retain`, never deleted |
 
-The `kong` Application now shows OutOfSync (replicas). Do not sync it until you retry the cutover. It has no
-automated sync, so nothing scales Kong back up by itself.
+Until you retry the cutover, do not change the Kong chart (`deploy/minikube/kong`) and do not apply it: a Helm upgrade
+of `kong` would set the replicas back to 1. CI applies on pushes to master, so pause it first:
+`gh variable set MINIKUBE_TERRAFORM_APPLY --repo mrjithendar/tools --body false`. Leave `kong_enabled` as it is:
+`false` would uninstall the release (PostgreSQL included; the PVC stays).
 
 Why this works without touching the applications: MOKS and jithendar.com NetworkPolicies admit both `traefik` and
 `kong` until 06 step 11.3; the ClusterIssuers solve DNS-01, which does not depend on either gateway; Traefik's
@@ -49,7 +51,7 @@ deleted later, recreate them with their original scripts before L4.
 
 ## Afterwards
 
-- Kong's database still has every route, consumer and certificate. To try again: fix the cause, `sync` the
-  Application (or `scale deploy/kong --replicas=1`), and resume at 06 step 7.
+- Kong's database still has every route, consumer and certificate. To try again: fix the cause, `terraform apply
+  -var-file=vars/mk4.tfvars` in `minikube-infrastructure` (or `scale deploy/kong --replicas=1`), and resume at 06 step 7.
 - To abandon Kong for good, take a final encrypted backup (05) before deleting anything; deleting the PVC keeps the
   PV and directory (`Retain`), which you then remove by hand on `mk4-m03` if you want the space.

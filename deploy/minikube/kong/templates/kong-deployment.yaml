@@ -9,8 +9,6 @@ metadata:
     app.kubernetes.io/name: kong
     app.kubernetes.io/part-of: kong-gateway
     app.kubernetes.io/version: "3.9.4"
-  annotations:
-    argocd.argoproj.io/sync-wave: "2"
 spec:
   replicas: 1
   # One replica: Recreate avoids two nodes during a rollout. A rollout is a short outage; plan it.

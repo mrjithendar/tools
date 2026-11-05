@@ -8,8 +8,6 @@ metadata:
   labels:
     app.kubernetes.io/name: kong-postgres
     app.kubernetes.io/part-of: kong-gateway
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
 data:
   10-kong-database.sh: |
     #!/bin/sh

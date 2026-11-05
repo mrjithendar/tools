@@ -8,8 +8,6 @@ metadata:
   labels:
     app.kubernetes.io/name: kong
     app.kubernetes.io/part-of: kong-gateway
-  annotations:
-    argocd.argoproj.io/sync-wave: "2"
 spec:
   type: ClusterIP
   selector:

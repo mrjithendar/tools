@@ -18,7 +18,7 @@ def test_catalog_has_unique_safe_ownership():
     assert not {'moks','catalogue-service','web'} & names
     assert not {'shopping-agent','product-ingestion','jfrog'} & names
     assert not {'argocd','traefik','coredns','kube-proxy','kindnet'}&names
-    assert len(apps)==7  # tools/deploy/minikube/applications; RoboShop is on EKS (roboshop-ai/argocd-eks)
+    assert len(apps)==5  # tools/deploy/minikube/applications; Terraform owns metrics-server and Kong; RoboShop is on EKS (roboshop-ai/argocd-eks)
     assert 'cert-manager' not in names
     assert not any(ns=='roboshop-ai' and kind in ('Deployment','StatefulSet') for _,kind,ns,_ in owners)
 
@@ -87,7 +87,16 @@ def test_inventory_excludes_cluster_managed_networking():
     inventory=[row for directory in CATALOGS for row in json.loads((directory/'workload-inventory.json').read_text())]
     assert not any(namespace=='kube-system' and name in {'coredns','kindnet','kube-proxy'}
                    for kind,namespace,name in inventory)
-    assert ['Deployment','kube-system','metrics-server'] in inventory
+    # Terraform Helm releases (minikube-infrastructure), not Applications.
+    assert not any(namespace in ('kube-system','kong','cert-manager','argocd') for kind,namespace,name in inventory)
+
+
+def test_terraform_releases_are_not_argo_applications():
+    apps={d['metadata']['name'] for d in module.catalog() if d['kind']=='Application'}
+    assert not apps & {'metrics-server','cert-manager','argocd','kong'}
+    for name in ('metrics-server','cert-manager','argocd','kong'):
+        assert (ROOT/'minikube-infrastructure'/f'{name}.tf').is_file()
+        assert not (ROOT/'deploy/minikube/applications'/f'{name}.yaml').exists()
 
 
 def test_required_inventory_matches_active_catalog_and_rejects_missing_workloads():

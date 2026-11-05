@@ -10,7 +10,7 @@ a Git repository, the tag is given so the claim can be re-checked.
 | Kong Gateway | **OSS 3.9.4**, image `kong:3.9.4` (Docker Official Image), Apache-2.0 | newest OSS release; nothing newer is published as OSS |
 | Kong Manager | Kong Manager OSS, bundled in 3.9.4 | bundled since 3.4.0 |
 | PostgreSQL | **17.11**, image `postgres:17.11-alpine` (Docker Official Image) | Kong 3.9 supports 13–17; 17 is the newest supported; same image MOKS already runs on mk4 (arm64) |
-| Helm chart | **not used to deploy**; `kong/kong` 3.4.1 evaluated | its bootstrap Job is an Argo CD Sync hook that re-runs on every sync; its PostgreSQL subchart image no longer exists |
+| Helm chart | upstream `kong/kong` **not used**; 3.4.1 evaluated. The reviewed manifests are a local chart installed by Terraform | its bootstrap Job is an Argo CD Sync hook that re-runs on every sync; its PostgreSQL subchart image no longer exists |
 | Kong Ingress Controller | **none** | not required; would own entities and fight Kong Manager |
 | decK | 1.69.0 (newest), `_format_version: "3.0"` | |
 
@@ -73,8 +73,9 @@ PostgreSQL 18 is newer but not listed for 3.9, so it is not used.
 
 Decision: an Argo CD Sync hook is recreated and run on **every** sync, which is exactly what you asked to prevent
 for `migrations bootstrap`, and the chart cannot drop those annotations (`migrations.jobAnnotations` only adds).
-So Kong is deployed with plain manifests (`deploy/minikube/kong/`), the same way this repository deploys Jaeger and
-the OpenTelemetry Collector, and the chart served as a reference for settings and probes. `helm lint` and
+So Kong is deployed with plain manifests, and the chart served as a reference for settings and probes. Those
+manifests are now the templates of a local chart (`deploy/minikube/kong/templates/`, no templating) that Terraform
+installs as a Helm release (`minikube-infrastructure/kong.tf`). `helm lint` and
 `helm template` of the chart were run during evaluation.
 
 ## Kong Ingress Controller

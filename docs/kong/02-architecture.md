@@ -36,7 +36,7 @@ Controller**. Evidence for every version: 01-compatibility.md.
 
 | Layer | Owner | Tool |
 |---|---|---|
-| Namespace `kong`, StorageClass `standard-retain`, PostgreSQL StatefulSet/Service/PVC/init ConfigMap, Kong Deployment/ConfigMap/Services, NetworkPolicies, bootstrap Job, cert-manager Certificates in `kong` | Git (`tools/deploy/minikube/kong`, namespace in `deploy/minikube/namespaces/kong.yaml`) | Argo CD Application `kong` (project `mk-gateway`), manual sync, never prune |
+| Namespace `kong`, StorageClass `standard-retain`, PostgreSQL StatefulSet/Service/PVC/init ConfigMap, Kong Deployment/ConfigMap/Services, NetworkPolicies, bootstrap Job, cert-manager Certificates in `kong` | Git (`tools/deploy/minikube/kong`, a local Helm chart: the manifests in `templates/`; namespace created by `create-secrets.sh`) | Terraform Helm release `kong` (`tools/minikube-infrastructure/kong.tf`), applied by a person |
 | Secrets `kong/kong-postgres`, `cert-manager/cloudflare-api-token` | a person | `create-secrets.sh`, `jithendar.com/scripts/create-dns01-secret.sh` |
 | Kong Services, Routes, Upstreams, Plugins, Consumers, credentials | **Kong's database** | Kong Manager / Admin API |
 | Kong Certificates `2bc41d85-…7345` (jithendar.com, www) and `81abe1c9-…be1` (db.jithendar.com) with their SNIs | **cert-sync sidecar only** | `cert-sync.yaml` |
@@ -47,11 +47,11 @@ Rules:
 
 1. **With no controller present, Kubernetes `Ingress`, `HTTPRoute`, Traefik CRDs (`IngressRoute`, `Middleware`,
    …) and Kong CRDs (`KongPlugin`, `KongConsumer`, …) do nothing.** Nothing reads them. Creating one changes no
-   traffic. The AppProject `mk-gateway` does not even allow Kong's CRDs.
-2. **Kubernetes reconciliation and Kong Manager never manage the same entity.** Argo CD manages Kubernetes
-   objects; it cannot see Kong entities. The only automation that writes Kong entities is cert-sync, and it owns
+   traffic. The release installs no Kong CRDs.
+2. **Kubernetes reconciliation and Kong Manager never manage the same entity.** The Helm release manages
+   Kubernetes objects; it cannot see Kong entities. The only automation that writes Kong entities is cert-sync, and it owns
    exactly two Certificates by id (tag `managed-by:cert-sync`). Do not edit those two in Kong Manager.
-3. **No automatic decK, Admin API or GitOps sync of Kong entities may run.** No CronJob, CI job, Argo CD hook or
+3. **No automatic decK, Admin API or GitOps sync of Kong entities may run.** No CronJob, CI job, Helm or Argo CD hook or
    controller runs decK. The seed is imported once by a person (06, step 6). After that, `deck gateway sync`
    against the live gateway is forbidden except during a deliberate restore (05). Git keeps reviewed exports
    (`deck gateway dump`, 05), which are records, not desired state.
@@ -64,17 +64,19 @@ until you export it. Rolling back a route is done in Kong Manager or from a back
 - KIC would translate Kubernetes objects into Kong entities and keep them in line, which is exactly the second
   owner rule 2 forbids, and it is not needed to proxy (01).
 - DB-less mode has no Admin API writes, so Kong Manager would be read-only, which defeats the goal.
-- The `kong/kong` chart's bootstrap Job is an Argo CD Sync hook that runs on every sync (01).
+- The upstream `kong/kong` chart's bootstrap Job is an Argo CD Sync hook that runs on every sync, and its
+  PostgreSQL subchart image no longer exists (01). Terraform installs the reviewed manifests instead, unchanged, as
+  the local chart `deploy/minikube/kong` (no values, no templating).
 
 ## PostgreSQL persistence
 
 | Layer | Protects against |
 |---|---|
-| PVC `kong-postgres-data` is a standalone object with `argocd.argoproj.io/sync-options: Prune=false,Delete=false` | Argo CD pruning it, or deleting it when the Application is deleted |
+| PVC `kong-postgres-data` is a standalone object with `helm.sh/resource-policy: keep` (so is the StorageClass) | `helm uninstall` / `terraform destroy` deleting it with the release |
 | StorageClass `standard-retain` (`k8s.io/minikube-hostpath`, `reclaimPolicy: Retain`) | `kubectl delete pvc` removing the PV and its directory |
 | `nodeSelector: kubernetes.io/hostname: mk4-m03` | the pod starting on another node with an empty hostPath directory (minikube hostPath PVs have no node affinity) |
 | Data under `PGDATA=/var/lib/postgresql/data/pgdata`, an init container hands the directory to uid 70 | permission failures on hostPath (same pattern as `moks-postgres`) |
-| Namespace `kong` from `deploy/minikube/namespaces/kong.yaml`, not from the Application | the Application ever owning (and deleting) the namespace |
+| Namespace `kong` created by `create-secrets.sh`, not by the release (`create_namespace = false`) | the release ever owning (and deleting) the namespace |
 
 Not protected: losing the mk4-m03 node container or the host disk. One PostgreSQL on one minikube host has **no
 high availability** (05).
@@ -85,13 +87,12 @@ worker with a small connection pool, well under 40 connections.
 
 ## Migrations
 
-- **Bootstrap, once:** Job `kong-migrations-bootstrap-3-9-4`, an ordinary resource in sync wave 1 (after
-  PostgreSQL in wave 0, before Kong in wave 2).
-  - Not a hook, so Argo CD creates it only when missing. A completed Job is compared, not re-run. Kubernetes adds
-    labels to a Job's selector and template; the Application ignores those two fields so the Job never looks
-    OutOfSync (which could tempt a Replace sync).
-  - No `ttlSecondsAfterFinished`: a garbage-collected Job would be recreated by the next sync.
-  - `Prune=false` on the Job.
+- **Bootstrap, once:** Job `kong-migrations-bootstrap-3-9-4`, an ordinary resource of the release. Helm creates
+  everything at once; order comes from the pods: the Job's init container waits for PostgreSQL, Kong's init
+  container waits for the bootstrapped schema.
+  - Not a Helm hook, so Helm creates it once and leaves it alone while its manifest is unchanged. A completed Job
+    is not re-run by `terraform apply`.
+  - No `ttlSecondsAfterFinished`: a garbage-collected Job would be recreated by the next upgrade.
   - The name carries the version; a later version never reuses it.
   - Kong itself: `bootstrap` takes the database cluster mutex and is a no-op on an initialised schema. `--force`
     (which resets) is never used.

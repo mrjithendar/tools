@@ -10,7 +10,7 @@ running until step 11, so rollback before then is a HAProxy switch.
 ## Before the window (days ahead)
 
 Argo CD Applications track `master`, and jithendar.com's CI applies `minikube/` on push to `master`. The branches
-must therefore be merged before their parts can be applied. Each merge is safe on its own: nothing on mk4 prunes or
+must therefore be merged before their parts can be applied (Kong itself is applied with Terraform from your checkout). Each merge is safe on its own: nothing on mk4 prunes or
 deletes, so Traefik's live objects stay and keep serving.
 
 | # | Action | Check | Pass |
@@ -21,20 +21,20 @@ deletes, so Traefik's live objects stay and keep serving.
 | P4 | Merge moks `feat/kong-db-migration`; sync `moks-root`, `moks-foundation`, `moks-opensearch` **without prune** | `$K -n moks get networkpolicy moks -o jsonpath='{.spec.ingress[*].from[*].namespaceSelector.matchLabels}'` | lists both `kong` and `traefik`; `moks-routing` still exists (`$K -n argocd get application moks-routing`) |
 | P5 | Merge tools `feat/kong-db-migration`. Do **not** sync `loki`, `prometheus`, `grafana` yet (harmless, but keep changes small) | `git -C tools log -1 origin/master --oneline` | contains the merge |
 | P6 | `bash tools/deploy/minikube/kong/create-secrets.sh` | `$K -n kong get secret kong-postgres -o jsonpath='{.data}' \| python3 -c 'import json,sys; print(sorted(json.load(sys.stdin)))'` | `['kong-password', 'superuser-password']` |
-| P7 | Create the project and Application without syncing: `$K apply -f tools/deploy/minikube/namespaces/kong.yaml -f tools/deploy/minikube/applications/project-gateway.yaml -f tools/deploy/minikube/applications/kong.yaml` | `$K -n argocd get application kong -o jsonpath='{.status.sync.status}'` | `OutOfSync` (nothing created yet) |
+| P7 | Move metrics-server, cert-manager and Argo CD to Terraform: `tools/minikube-infrastructure/README.md`, steps 1–6. Kong is not installed yet | `helm --kube-context mk4 list -A` | `metrics-server`, `cert-manager`, `argocd` `deployed`; no `kong` |
 
 ## In the window
 
-Selective syncs below use the Application's `operation` field (what `scripts/argocd/deploy.py` does for a whole
-app), so each step creates only its own objects. `python3 scripts/argocd/deploy.py kong --context mk4` would do
-steps 3–5 in one go, in sync-wave order.
+Steps 3–5 are one Helm release, `kong` (`tools/minikube-infrastructure/kong.tf`), off until `kong_enabled = true`. Helm creates all of its objects
+at once; the pods keep the order: the bootstrap Job's init container waits for PostgreSQL, and Kong's init container
+waits for the bootstrapped schema. At step 3, set `kong_enabled = true` in `tools/minikube-infrastructure/vars/mk4.tfvars` and
+start the apply in a second terminal (it waits up to 15 minutes for everything to be ready), then work through the
+checks of 3, 4 and 5 in order. If a check fails, stop there. Push the tfvars change afterwards, so CI agrees with the
+cluster; if `MINIKUBE_TERRAFORM_APPLY` is on, pushing it instead of applying by hand also works (Actions shows
+progress).
 
 ```bash
-sync() {  # sync only the listed resources of Application kong, never prune
-  $K -n argocd patch application kong --type merge -p "{\"operation\":{\"initiatedBy\":{\"username\":\"runbook\"},\"sync\":{\"prune\":false,\"resources\":$1}}}"
-  until [ "$($K -n argocd get application kong -o jsonpath='{.status.operationState.phase}')" != Running ]; do sleep 3; done
-  $K -n argocd get application kong -o jsonpath='{.status.operationState.phase}{"  "}{.status.operationState.message}{"\n"}'
-}
+terraform -chdir=tools/minikube-infrastructure apply -var-file=vars/mk4.tfvars
 ```
 
 ### 1. Pre-checks and backups
@@ -57,16 +57,7 @@ with Traefik's (30080/30443). Keeping Traefik up makes rollback a HAProxy switch
 
 ### 3. Start PostgreSQL
 
-```bash
-sync '[{"group":"storage.k8s.io","kind":"StorageClass","name":"standard-retain"},
-       {"kind":"PersistentVolumeClaim","namespace":"kong","name":"kong-postgres-data"},
-       {"kind":"ConfigMap","namespace":"kong","name":"kong-postgres-init"},
-       {"kind":"Service","namespace":"kong","name":"kong-postgres"},
-       {"group":"apps","kind":"StatefulSet","namespace":"kong","name":"kong-postgres"},
-       {"group":"networking.k8s.io","kind":"NetworkPolicy","namespace":"kong","name":"default-deny"},
-       {"group":"networking.k8s.io","kind":"NetworkPolicy","namespace":"kong","name":"kong-postgres"},
-       {"group":"networking.k8s.io","kind":"NetworkPolicy","namespace":"kong","name":"kong-jobs"}]'
-```
+Start the `terraform apply` above.
 
 | Check | Pass |
 |---|---|
@@ -78,29 +69,17 @@ sync '[{"group":"storage.k8s.io","kind":"StorageClass","name":"standard-retain"}
 
 ### 4. Run the migration Job
 
-```bash
-sync '[{"kind":"ConfigMap","namespace":"kong","name":"kong-config"},
-       {"group":"batch","kind":"Job","namespace":"kong","name":"kong-migrations-bootstrap-3-9-4"}]'
-```
+Created by the same apply; nothing to run.
 
 | Check | Pass |
 |---|---|
 | `$K -n kong wait --for=condition=complete job/kong-migrations-bootstrap-3-9-4 --timeout=600s` | `condition met` |
 | `$K -n kong logs job/kong-migrations-bootstrap-3-9-4 -c bootstrap \| tail -3` | `Database is up-to-date` / `… migrations processed` |
-| Re-sync proof (the Job must not run again): `sync '[{"group":"batch","kind":"Job","namespace":"kong","name":"kong-migrations-bootstrap-3-9-4"}]'`, then `$K -n kong get job kong-migrations-bootstrap-3-9-4 -o jsonpath='{.metadata.creationTimestamp} {.status.succeeded}'` | same creation time as before, `1` |
+| Re-apply proof (the Job must not run again), after the apply has finished: run the same `terraform apply` again, then `$K -n kong get job kong-migrations-bootstrap-3-9-4 -o jsonpath='{.metadata.creationTimestamp} {.status.succeeded}'` | `No changes`; same creation time as before, `1` |
 
 ### 5. Start Kong
 
-```bash
-sync '[{"kind":"ConfigMap","namespace":"kong","name":"kong-cert-sync"},
-       {"group":"apps","kind":"Deployment","namespace":"kong","name":"kong"},
-       {"kind":"Service","namespace":"kong","name":"kong-proxy"},{"kind":"Service","namespace":"kong","name":"kong-proxy-test"},
-       {"kind":"Service","namespace":"kong","name":"kong-admin"},{"kind":"Service","namespace":"kong","name":"kong-manager"},
-       {"kind":"Service","namespace":"kong","name":"kong-status"},
-       {"group":"networking.k8s.io","kind":"NetworkPolicy","namespace":"kong","name":"kong"},
-       {"group":"cert-manager.io","kind":"Certificate","namespace":"kong","name":"jithendar-com"},
-       {"group":"cert-manager.io","kind":"Certificate","namespace":"kong","name":"db-jithendar-com"}]'
-```
+Started by the same apply. Wait for it to finish without errors.
 
 | Check | Pass |
 |---|---|
@@ -108,7 +87,7 @@ sync '[{"kind":"ConfigMap","namespace":"kong","name":"kong-cert-sync"},
 | `$K -n kong exec deploy/kong -c kong -- kong health` | `Kong is healthy` |
 | `$K -n kong get certificate` | both `READY True` (DNS-01, can take a few minutes) |
 | `$K -n kong logs deploy/kong -c cert-sync \| tail -2` | `uploaded for jithendar.com,www.jithendar.com -> HTTP 200` and the same for `db.jithendar.com` |
-| `$K -n argocd get application kong -o jsonpath='{.status.sync.status} {.status.health.status}'` | `Synced Healthy` |
+| `helm --kube-context mk4 -n kong status kong \| grep STATUS`; the apply's last line | `STATUS: deployed`; `Apply complete!` |
 | Admin API not on the network. From `monitoring` (allowed to reach Kong's status port only): `IP=$($K -n kong get pod -l app.kubernetes.io/name=kong -o jsonpath='{.items[0].status.podIP}'); $K -n monitoring run probe --rm -i --restart=Never --image=busybox:1.37 -- sh -c "wget -T 3 -qO- http://$IP:8007/status >/dev/null && echo status-ok; wget -T 3 -qO- http://$IP:8001/status && echo ADMIN-REACHABLE \|\| echo admin-closed"` | `status-ok` then `admin-closed`. Without `status-ok` the probe itself was blocked and the test says nothing |
 
 ### 6. Import the seed (decK)

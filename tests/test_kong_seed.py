@@ -191,7 +191,8 @@ KONG = ROOT / 'deploy/minikube/kong'
 
 
 def kong_docs():
-    return list(yaml.safe_load_all(subprocess.check_output(['kubectl', 'kustomize', str(KONG)], text=True)))
+    rendered = subprocess.check_output(['helm', 'template', 'kong', str(KONG), '--namespace', 'kong'], text=True)
+    return [d for d in yaml.safe_load_all(rendered) if d]
 
 
 def test_admin_and_manager_never_public():
@@ -212,7 +213,7 @@ def test_admin_and_manager_never_public():
 
 def test_bootstrap_job_runs_once_and_is_not_a_hook():
     job = next(d for d in kong_docs() if d['kind'] == 'Job')
-    annotations = job['metadata']['annotations']
+    annotations = job['metadata'].get('annotations') or {}
     assert 'argocd.argoproj.io/hook' not in annotations and 'helm.sh/hook' not in annotations
     assert 'ttlSecondsAfterFinished' not in job['spec']
     assert job['metadata']['name'].endswith('3-9-4')
@@ -227,10 +228,17 @@ def test_images_pinned_and_database_persistent():
     assert images == {'kong:3.9.4', 'postgres:17.11-alpine', 'python:3.13-alpine'}
     pvc = next(d for d in docs if d['kind'] == 'PersistentVolumeClaim')
     assert pvc['spec']['storageClassName'] == 'standard-retain'
-    assert pvc['metadata']['annotations']['argocd.argoproj.io/sync-options'] == 'Prune=false,Delete=false'
     storage_class = next(d for d in docs if d['kind'] == 'StorageClass')
+    for kept in (pvc, storage_class):  # survive helm uninstall / terraform destroy
+        assert kept['metadata']['annotations']['helm.sh/resource-policy'] == 'keep'
     assert storage_class['reclaimPolicy'] == 'Retain' and storage_class['provisioner'] == 'k8s.io/minikube-hostpath'
     assert not [d for d in docs if d['kind'] == 'Secret']
+    assert not [d for d in docs if any(k.startswith('argocd.argoproj.io/') for k in (d['metadata'].get('annotations') or {}))]
+
+
+def test_upgrade_jobs_stay_out_of_the_release():
+    assert (KONG / 'upgrade/migrations-up-job.yaml').is_file()
+    assert not [d for d in kong_docs() if d['kind'] == 'Job' and 'bootstrap' not in d['metadata']['name']]
 
 
 def test_review_export_redacts_credentials_and_keys():

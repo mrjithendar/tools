@@ -1,4 +1,4 @@
-# kong migrations finish: TEMPLATE, applied by hand during an upgrade. Not in kustomization.yaml, so Argo CD never
+# kong migrations finish: TEMPLATE, applied by hand during an upgrade. Outside templates/, so the Helm release never
 # creates or re-runs it. Step 2, only after every node runs the new version: removes what old nodes still needed.
 # Replace NEW_VERSION (for example 3.9.5) everywhere, and the image pin, before applying:
 #   sed 's/NEW_VERSION/3.9.5/g' upgrade/migrations-finish-job.yaml | kubectl --context mk4 apply -f -
