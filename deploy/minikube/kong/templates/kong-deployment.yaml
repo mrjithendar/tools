@@ -1,0 +1,143 @@
+# Kong Gateway OSS 3.9.4, one replica, database mode. No Kong Ingress Controller: nothing in Kubernetes is
+# translated into Kong entities (docs/kong/02-architecture.md).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong
+  namespace: kong
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: kong-gateway
+    app.kubernetes.io/version: "3.9.4"
+spec:
+  replicas: 1
+  # One replica: Recreate avoids two nodes during a rollout. A rollout is a short outage; plan it.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kong
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kong
+        app.kubernetes.io/part-of: kong-gateway
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        # Secret volumes are root-owned; fsGroup makes the certificate files group-readable for cert-sync.
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      # Start only against a reachable, bootstrapped database. `kong migrations list` exits 0 when the schema
+      # is current and 4 when only `migrations finish` is pending (new nodes may run then, by design of Kong's
+      # two-step upgrade). 3 (needs bootstrap), 5 (needs `up`) and 1 (unreachable) keep waiting.
+      - name: wait-for-migrations
+        image: kong:3.9.4
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - |
+          while true; do
+            kong migrations list >/dev/null 2>&1; rc=$?
+            if [ "$rc" = 0 ] || [ "$rc" = 4 ]; then exit 0; fi
+            echo "kong migrations list exited $rc; waiting for PostgreSQL and the bootstrap Job"; sleep 5
+          done
+        envFrom:
+        - configMapRef: {name: kong-config}
+        env:
+        - name: KONG_PG_PASSWORD
+          valueFrom:
+            secretKeyRef: {name: kong-postgres, key: kong-password}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+        resources:
+          requests: {cpu: 50m, memory: 128Mi}
+          limits: {cpu: 500m, memory: 512Mi}
+        volumeMounts:
+        - {name: prefix, mountPath: /kong_prefix}
+        - {name: tmp, mountPath: /tmp}
+      containers:
+      - name: kong
+        image: kong:3.9.4
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef: {name: kong-config}
+        env:
+        - name: KONG_PG_PASSWORD
+          valueFrom:
+            secretKeyRef: {name: kong-postgres, key: kong-password}
+        ports:
+        - {name: proxy, containerPort: 8000}
+        - {name: proxy-tls, containerPort: 8443}
+        - {name: proxy-test, containerPort: 8180}
+        - {name: proxy-test-tls, containerPort: 8543}
+        - {name: stream-tls, containerPort: 9443}
+        - {name: status, containerPort: 8007}
+        # Loopback only (kong-config): listed for kubectl port-forward by name.
+        - {name: admin, containerPort: 8001}
+        - {name: manager, containerPort: 8002}
+        readinessProbe:
+          httpGet: {path: /status/ready, port: status}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet: {path: /status, port: status}
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 4
+        lifecycle:
+          preStop:
+            exec:
+              command: [kong, quit, --wait=15]
+        resources:
+          requests: {cpu: 200m, memory: 512Mi}
+          limits: {cpu: "1", memory: 1Gi}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+        volumeMounts:
+        - {name: prefix, mountPath: /kong_prefix}
+        - {name: tmp, mountPath: /tmp}
+      - name: cert-sync
+        image: python:3.13-alpine
+        imagePullPolicy: IfNotPresent
+        command: [python3, -I, /app/cert_sync.py]
+        env:
+        - {name: KONG_ADMIN_URL, value: "http://127.0.0.1:8001"}
+        - {name: SYNC_INTERVAL_SECONDS, value: "300"}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+        resources:
+          requests: {cpu: 5m, memory: 24Mi}
+          limits: {cpu: 100m, memory: 64Mi}
+        volumeMounts:
+        - {name: cert-sync, mountPath: /app, readOnly: true}
+        - {name: cert-jithendar-com, mountPath: /certs/jithendar-com, readOnly: true}
+        - {name: cert-db-jithendar-com, mountPath: /certs/db-jithendar-com, readOnly: true}
+      volumes:
+      - name: prefix
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+      - name: cert-sync
+        configMap: {name: kong-cert-sync}
+      # optional: Kong starts before cert-manager has issued; cert-sync waits for the files.
+      - name: cert-jithendar-com
+        secret: {secretName: jithendar-com-tls, optional: true, defaultMode: 0440}
+      - name: cert-db-jithendar-com
+        secret: {secretName: db-jithendar-com-tls, optional: true, defaultMode: 0440}

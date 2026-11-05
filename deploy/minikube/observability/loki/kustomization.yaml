@@ -1,5 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+# Public routes (/loki/api/v1/push and the read API) are Kong routes now, not Ingresses:
+# kong-config/seed/kong.yaml and docs/kong/README.md. Previous Traefik objects: traefik-backup-conf/.
 resources:
 - alloy-service-account.yaml
 - alloy-logs-cluster-role.yaml
@@ -8,10 +10,6 @@ resources:
 - alloy-data-pvc.yaml
 - loki-deployment.yaml
 - loki-service.yaml
-- loki-push-auth-middleware.yaml
-- loki-push-ingress.yaml
-- loki-read-auth-middleware.yaml
-- loki-read-ingress.yaml
 - alloy-deployment.yaml
 - alloy-service.yaml
 configMapGenerator:

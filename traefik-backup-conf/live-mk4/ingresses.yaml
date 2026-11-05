@@ -1,0 +1,393 @@
+# Cleaned export from mk4 on 2026-11-05 (uid, resourceVersion, managedFields, status removed). Reference for rollback.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: 'true'
+  name: argocd
+  namespace: argocd
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+        path: /argocd
+        pathType: Prefix
+  tls:
+  - hosts:
+    - jithendar.com
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: argocd-argocd-https@kubernetescrd
+  name: argocd-http
+  namespace: argocd
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+        path: /argocd
+        pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: jithendar-strip-trace-headers@kubernetescrd,jithendar-compress@kubernetescrd
+    traefik.ingress.kubernetes.io/router.tls: 'true'
+  name: jithendar-com
+  namespace: jithendar
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: jithendar-com
+            port:
+              name: http
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - jithendar.com
+    secretName: jithendar-com-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: jithendar-https-redirect@kubernetescrd
+  name: jithendar-com-http
+  namespace: jithendar
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: jithendar-com
+            port:
+              name: http
+        path: /
+        pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: jithendar-www-redirect@kubernetescrd
+    traefik.ingress.kubernetes.io/router.tls: 'true'
+  name: jithendar-com-www
+  namespace: jithendar
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: www.jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: jithendar-com
+            port:
+              name: http
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - www.jithendar.com
+    secretName: jithendar-com-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: jithendar-www-redirect@kubernetescrd
+  name: jithendar-com-www-http
+  namespace: jithendar
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: www.jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: jithendar-com
+            port:
+              name: http
+        path: /
+        pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: jithendar-db-allowlist@kubernetescrd,jithendar-db-slash@kubernetescrd,jithendar-db-headers@kubernetescrd
+    traefik.ingress.kubernetes.io/router.tls: 'true'
+  name: jithendar-db-ui
+  namespace: jithendar
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: jithendar-db-ui
+            port:
+              name: http
+        path: /db
+        pathType: Prefix
+  tls:
+  - hosts:
+    - jithendar.com
+    secretName: jithendar-com-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: moks-routing:networking.k8s.io/Ingress:moks/moks
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: 'true'
+  labels:
+    app.kubernetes.io/instance: moks
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: moks
+    app.kubernetes.io/version: 0.1.0
+  name: moks
+  namespace: moks
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: moks-terminal
+            port:
+              name: http
+        path: /moks/api/terminal
+        pathType: Prefix
+      - backend:
+          service:
+            name: moks-api
+            port:
+              name: http
+        path: /moks
+        pathType: Prefix
+  tls:
+  - hosts:
+    - jithendar.com
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: moks-routing:networking.k8s.io/Ingress:moks/moks-http
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: moks-https-redirect@kubernetescrd
+  labels:
+    app.kubernetes.io/instance: moks
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: moks
+    app.kubernetes.io/version: 0.1.0
+  name: moks-http
+  namespace: moks
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: moks-api
+            port:
+              name: http
+        path: /moks
+        pathType: Prefix
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: grafana:networking.k8s.io/Ingress:monitoring/grafana
+    traefik.ingress.kubernetes.io/router.tls: 'true'
+  labels:
+    app.kubernetes.io/instance: grafana
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/version: 13.2.4
+    helm.sh/chart: grafana-14.0.1
+  name: grafana
+  namespace: monitoring
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: grafana
+            port:
+              number: 80
+        path: /grafana
+        pathType: Prefix
+  tls:
+  - hosts:
+    - jithendar.com
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: loki:networking.k8s.io/Ingress:monitoring/loki-push
+    traefik.ingress.kubernetes.io/router.middlewares: monitoring-loki-push-auth@kubernetescrd
+    traefik.ingress.kubernetes.io/router.tls: 'true'
+  name: loki-push
+  namespace: monitoring
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: loki
+            port:
+              number: 3100
+        path: /loki/api/v1/push
+        pathType: Exact
+  tls:
+  - hosts:
+    - jithendar.com
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: loki:networking.k8s.io/Ingress:monitoring/loki-read
+    traefik.ingress.kubernetes.io/router.middlewares: monitoring-loki-read-auth@kubernetescrd
+    traefik.ingress.kubernetes.io/router.tls: 'true'
+  name: loki-read
+  namespace: monitoring
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: loki
+            port:
+              number: 3100
+        path: /loki/api/v1/query_range
+        pathType: Exact
+      - backend:
+          service:
+            name: loki
+            port:
+              number: 3100
+        path: /loki/api/v1/labels
+        pathType: Exact
+      - backend:
+          service:
+            name: loki
+            port:
+              number: 3100
+        path: /loki/api/v1/format_query
+        pathType: Exact
+      - backend:
+          service:
+            name: loki
+            port:
+              number: 3100
+        path: /loki/api/v1/label
+        pathType: Prefix
+  tls:
+  - hosts:
+    - jithendar.com
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: prometheus:networking.k8s.io/Ingress:monitoring/prometheus
+    traefik.ingress.kubernetes.io/router.middlewares: monitoring-prometheus-auth@kubernetescrd
+    traefik.ingress.kubernetes.io/router.tls: 'true'
+  name: prometheus
+  namespace: monitoring
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+        path: /prometheus
+        pathType: Prefix
+  tls:
+  - hosts:
+    - jithendar.com
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: prometheus:networking.k8s.io/Ingress:monitoring/prometheus-remote-write
+    traefik.ingress.kubernetes.io/router.middlewares: monitoring-prometheus-remote-write-auth@kubernetescrd
+    traefik.ingress.kubernetes.io/router.tls: 'true'
+  name: prometheus-remote-write
+  namespace: monitoring
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: jithendar.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+        path: /prometheus/api/v1/write
+        pathType: Exact
+  tls:
+  - hosts:
+    - jithendar.com

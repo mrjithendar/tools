@@ -1,7 +1,8 @@
 # Argo CD catalog: observability stack
 
 Applications for the shared observability stack, whose sources live in this repository under `observability/`.
-All five are in the AppProject `mk-observability` (`project-observability.yaml`); `metrics-server` stays in `mk-platform`.
+All five are in the AppProject `mk-observability` (`project-observability.yaml`). metrics-server, cert-manager,
+Argo CD and Kong are not Applications: Terraform installs them as Helm releases ([`minikube-infrastructure`](../../../minikube-infrastructure/README.md)).
 `deploy.py` creates a missing project and moves an existing Application to the project Git names, but it does not
 update an AppProject that already exists: `kubectl --context mk4 apply -f deploy/minikube/applications/project-observability.yaml`.
 

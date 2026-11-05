@@ -1,0 +1,485 @@
+# Initial Kong entities for mk4: a REFERENCE COPY, imported once by hand with decK (docs/kong/06-cutover-runbook.md,
+# step 6). After that import, Kong's database is the source of truth and Kong Manager is where routes change.
+# Nothing may sync this file automatically. `deck gateway sync` against the live gateway is forbidden except
+# during a deliberate restore (docs/kong/05-backup-restore.md).
+#
+# Reproduces every live Traefik route of 2026-11-05 (docs/kong/00-discovery.md; mapping in docs/kong/README.md).
+# Not in here, on purpose:
+#   - Consumers and credentials (basic-auth users, ACL group membership): created by hand, docs/kong/04 and 05.
+#     Until they exist, the basic-auth routes answer 401 to everyone (fail closed).
+#   - Certificates and SNIs: owned by the cert-sync sidecar (deploy/minikube/kong/cert-sync.yaml).
+#
+# select_tags makes decK add seed:v1 to every entity below and limits validate/diff/apply to entities carrying it,
+# so entities created in Kong Manager (untagged) and cert-sync's certificates are outside decK's view.
+# Every field is written out on each entity (no _info.defaults): decK applies custom defaults to existing objects
+# too, which would turn a later diff into silent edits. Common values: services connect 10 s, read/write 300 s,
+# 2 retries; routes preserve_host, no strip_path, 301 to HTTPS, unbuffered responses (Traefik streamed them;
+# Next.js streaming and Argo CD's event streams need that), buffered requests.
+#
+# Router facts this relies on (Kong 3.9.4, router_flavor traditional_compatible, kong/router/transform.lua):
+# a route matching more fields wins (methods beat a path-only route), then regex paths beat prefix paths, then
+# the longer prefix wins. Regex paths start with "~" and are anchored at the start of the path.
+_format_version: "3.0"
+_info:
+  select_tags:
+  - seed:v1
+
+# Runs for every request, before routing: drop forwarding headers sent by the client. Kong 3.9.4 appends to a
+# client-supplied X-Forwarded-For ("<client value>, <connecting address>") and trusts X-Forwarded-Proto/Host/
+# Port/Prefix from trusted_ips, which here is HAProxy's network, i.e. every connection. Without this, the first
+# X-Forwarded-For entry (what jithendar.com logs and rate-limits on) would be chosen by the visitor. With it,
+# Kong sets X-Forwarded-For to the real address from the PROXY protocol header.
+plugins:
+- name: pre-function
+  instance_name: strip-client-forwarding-headers
+  tags: [scope:global]
+  config:
+    rewrite:
+    - |
+      local clear = kong.service.request.clear_header
+      clear("X-Forwarded-For")
+      clear("X-Forwarded-Proto")
+      clear("X-Forwarded-Host")
+      clear("X-Forwarded-Port")
+      clear("X-Forwarded-Path")
+      clear("X-Forwarded-Prefix")
+      clear("X-Real-IP")
+      clear("Forwarded")
+
+services:
+# --- jithendar.com ------------------------------------------------------------------------------------------
+- name: jithendar-com
+  tags: [app:jithendar-com]
+  protocol: http
+  host: jithendar-com.jithendar.svc.cluster.local
+  port: 80
+  connect_timeout: 10000
+  read_timeout: 300000
+  write_timeout: 300000
+  retries: 2
+  plugins:
+  # Traefik middleware strip-trace-headers: visitors must not choose the site's trace ids.
+  - name: request-transformer
+    instance_name: jithendar-com-strip-trace-headers
+    config:
+      remove:
+        headers: [traceparent, tracestate, baggage]
+  routes:
+  # Traefik: Ingress jithendar-com (websecure) + jithendar-com-http (web, https-redirect, 301).
+  - name: jithendar-com
+    tags: [app:jithendar-com]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    paths: [/]
+  # Traefik: Ingresses jithendar-com-www and jithendar-com-www-http, middleware www-redirect (301 to the apex,
+  # path and query kept), on both HTTP and HTTPS, in one hop.
+  - name: jithendar-com-www-redirect
+    tags: [app:jithendar-com]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [http, https]
+    hosts: [www.jithendar.com]
+    paths: [/]
+    plugins:
+    - name: redirect
+      instance_name: www-to-apex
+      config:
+        status_code: 301
+        location: https://jithendar.com
+        keep_incoming_path: true
+
+# --- jithendar.com database access (Adminer at /db/) ---------------------------------------------------------
+- name: jithendar-db-ui
+  tags: [app:jithendar-db]
+  protocol: http
+  host: jithendar-db-ui.jithendar.svc.cluster.local
+  port: 80
+  connect_timeout: 10000
+  read_timeout: 300000
+  write_timeout: 300000
+  retries: 2
+  plugins:
+  # Traefik middleware db-allowlist. Runs first (priority 990), so others get 403 before any redirect.
+  - name: ip-restriction
+    instance_name: db-ui-allowlist
+    config:
+      allow: [122.177.247.138, 46.224.38.14]
+      status: 403
+      message: Forbidden
+  # Traefik middleware db-headers. replace + add = always set, whether or not Adminer sent the header.
+  - name: response-transformer
+    instance_name: db-ui-headers
+    config:
+      replace:
+        headers:
+        - "Cache-Control:no-store"
+        - "X-Robots-Tag:noindex, nofollow"
+        - "X-Frame-Options:DENY"
+        - "X-Content-Type-Options:nosniff"
+        - "Referrer-Policy:no-referrer"
+      add:
+        headers:
+        - "Cache-Control:no-store"
+        - "X-Robots-Tag:noindex, nofollow"
+        - "X-Frame-Options:DENY"
+        - "X-Content-Type-Options:nosniff"
+        - "Referrer-Policy:no-referrer"
+  routes:
+  # Traefik: Ingress jithendar-db-ui, path /db (Prefix), HTTPS only.
+  - name: jithendar-db-ui
+    tags: [app:jithendar-db]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    paths: [/db/]
+  # Traefik middleware db-slash: exactly /db -> /db/ (302, as Traefik's permanent: false).
+  - name: jithendar-db-ui-slash
+    tags: [app:jithendar-db]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    paths: [~/db$]
+    plugins:
+    - name: redirect
+      instance_name: db-add-slash
+      config:
+        status_code: 302
+        location: https://jithendar.com/db/
+        keep_incoming_path: false
+
+# PostgreSQL at db.jithendar.com:443 (Traefik IngressRouteTCP jithendar-db + TLSOption db-postgres + MiddlewareTCP
+# db-allowlist). Kong terminates TLS on its stream listener with cert-sync's db.jithendar.com certificate and
+# ALPN "postgresql" (KONG_NGINX_SPROXY_SSL_ALPN), then forwards plain TCP. HAProxy sends only this SNI there.
+- name: jithendar-postgres
+  tags: [app:jithendar-db]
+  protocol: tcp
+  host: jithendar-postgres.jithendar.svc.cluster.local
+  port: 5432
+  retries: 2
+  connect_timeout: 10000
+  read_timeout: 3600000
+  write_timeout: 3600000
+  plugins:
+  - name: ip-restriction
+    instance_name: db-tcp-allowlist
+    protocols: [tls]
+    config:
+      allow: [122.177.247.138, 46.224.38.14]
+  routes:
+  - name: jithendar-postgres-tls
+    tags: [app:jithendar-db]
+    preserve_host: true
+    strip_path: false
+    protocols: [tls]
+    snis: [db.jithendar.com]
+
+# --- MOKS -----------------------------------------------------------------------------------------------------
+# Traefik: Ingress moks (websecure) and moks-http (web -> https 301). No prefix stripping: MOKS serves its SPA, API,
+# SSE and auth callbacks under /moks. No compression on SSE (gzip_types excludes text/event-stream).
+- name: moks-api
+  tags: [app:moks]
+  protocol: http
+  host: moks-api.moks.svc.cluster.local
+  port: 8080
+  connect_timeout: 10000
+  retries: 2
+  # Server-Sent Events: an investigation stream can be quiet for minutes.
+  read_timeout: 3600000
+  write_timeout: 3600000
+  routes:
+  - name: moks
+    tags: [app:moks]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    # "~/moks$" plus "/moks/" = Ingress Prefix /moks, which does not match /moksfoo.
+    paths: [~/moks$, /moks/]
+- name: moks-terminal
+  tags: [app:moks]
+  protocol: http
+  host: moks-terminal.moks.svc.cluster.local
+  port: 8080
+  connect_timeout: 10000
+  retries: 2
+  # WebSocket shells; HAProxy's own idle limit is also 1 h. Kong OSS proxies the Upgrade on an https route.
+  read_timeout: 3600000
+  write_timeout: 3600000
+  routes:
+  # Longer prefix, so it wins over /moks/.
+  - name: moks-terminal
+    tags: [app:moks]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    paths: [/moks/api/terminal]
+
+# Traefik IngressRoute opensearch: read-only. GET/HEAD anywhere under /opensearch, plus POST to the search
+# endpoints; anything else falls through to the site's "/" route, as with Traefik. Prefix /opensearch stripped.
+- name: moks-opensearch
+  tags: [app:moks]
+  protocol: http
+  host: moks-opensearch.moks.svc.cluster.local
+  port: 9200
+  connect_timeout: 10000
+  read_timeout: 300000
+  write_timeout: 300000
+  retries: 2
+  plugins:
+  - name: basic-auth
+    instance_name: opensearch-basic-auth
+    config:
+      hide_credentials: true
+      realm: opensearch
+  routes:
+  - name: moks-opensearch-read
+    tags: [app:moks]
+    preserve_host: true
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    methods: [GET, HEAD]
+    paths: [~/opensearch$, /opensearch/]
+    strip_path: true
+    plugins:
+    - name: acl
+      instance_name: opensearch-read-acl
+      config:
+        allow: [opensearch-readers]
+        hide_groups_header: true
+  # strip_path on a regex removes the whole match, so the prefix is removed with a capture instead.
+  - name: moks-opensearch-search
+    tags: [app:moks]
+    preserve_host: true
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    methods: [POST]
+    paths: ["~/opensearch((?:/[^/]+)?/_(?:search|msearch|count))$"]
+    strip_path: false
+    plugins:
+    - name: acl
+      instance_name: opensearch-search-acl
+      config:
+        allow: [opensearch-readers]
+        hide_groups_header: true
+    - name: request-transformer
+      instance_name: opensearch-search-strip-prefix
+      config:
+        replace:
+          uri: $(uri_captures[1])
+
+# Traefik IngressRoute opensearch-dashboards: its own login (it can write). No stripping.
+- name: moks-opensearch-dashboards
+  tags: [app:moks]
+  protocol: http
+  host: moks-opensearch-dashboards.moks.svc.cluster.local
+  port: 5601
+  connect_timeout: 10000
+  retries: 2
+  read_timeout: 3600000
+  write_timeout: 3600000
+  plugins:
+  - name: basic-auth
+    instance_name: opensearch-dashboards-basic-auth
+    config:
+      hide_credentials: true
+      realm: opensearch-dashboards
+  - name: acl
+    instance_name: opensearch-dashboards-acl
+    config:
+      allow: [opensearch-dashboards-users]
+      hide_groups_header: true
+  routes:
+  - name: moks-opensearch-dashboards
+    tags: [app:moks]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    paths: [~/opensearch-dashboards$, /opensearch-dashboards/]
+
+# --- tools: Argo CD, Grafana, Prometheus, Loki ----------------------------------------------------------------
+# Traefik: Ingress argocd + argocd-http (middleware argocd-https, 301). Argo CD serves /argocd itself (rootpath),
+# runs insecure behind the gateway, and streams application events.
+- name: argocd-server
+  tags: [app:argocd]
+  protocol: http
+  host: argocd-server.argocd.svc.cluster.local
+  port: 80
+  connect_timeout: 10000
+  retries: 2
+  read_timeout: 3600000
+  write_timeout: 3600000
+  routes:
+  - name: argocd
+    tags: [app:argocd]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    paths: [~/argocd$, /argocd/]
+
+# Traefik: Ingress grafana (HTTPS only; HTTP falls to the site's redirect). Grafana serves /grafana itself.
+- name: grafana
+  tags: [app:grafana]
+  protocol: http
+  host: grafana.monitoring.svc.cluster.local
+  port: 80
+  connect_timeout: 10000
+  retries: 2
+  # Grafana Live uses WebSockets.
+  read_timeout: 3600000
+  write_timeout: 3600000
+  routes:
+  - name: grafana
+    tags: [app:grafana]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    paths: [~/grafana$, /grafana/]
+
+# Traefik: Ingresses prometheus (Prefix /prometheus, middleware prometheus-auth -> Secret monitoring-auth) and
+# prometheus-remote-write (Exact /prometheus/api/v1/write, its own login). One basic-auth on the Service; each
+# route admits only its own ACL group, so the remote-write login cannot read and the reader cannot write.
+- name: prometheus
+  tags: [app:prometheus]
+  protocol: http
+  host: prometheus.monitoring.svc.cluster.local
+  port: 9090
+  connect_timeout: 10000
+  read_timeout: 300000
+  write_timeout: 300000
+  retries: 2
+  plugins:
+  - name: basic-auth
+    instance_name: prometheus-basic-auth
+    config:
+      hide_credentials: true
+      realm: prometheus
+  routes:
+  - name: prometheus
+    tags: [app:prometheus]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    paths: [~/prometheus$, /prometheus/]
+    plugins:
+    - name: acl
+      instance_name: prometheus-read-acl
+      config:
+        allow: [prometheus-readers]
+        hide_groups_header: true
+  # Regex beats the /prometheus/ prefix, like Traefik's longer Exact rule.
+  - name: prometheus-remote-write
+    tags: [app:prometheus]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    paths: [~/prometheus/api/v1/write$]
+    plugins:
+    - name: acl
+      instance_name: prometheus-remote-write-acl
+      config:
+        allow: [prometheus-remote-write]
+        hide_groups_header: true
+
+# Traefik: Ingresses loki-push (Exact /loki/api/v1/push) and loki-read (Exact query_range, labels, format_query;
+# Prefix /loki/api/v1/label), separate logins. Same pattern as Prometheus.
+- name: loki
+  tags: [app:loki]
+  protocol: http
+  host: loki.monitoring.svc.cluster.local
+  port: 3100
+  connect_timeout: 10000
+  read_timeout: 300000
+  write_timeout: 300000
+  retries: 2
+  plugins:
+  - name: basic-auth
+    instance_name: loki-basic-auth
+    config:
+      hide_credentials: true
+      realm: loki
+  routes:
+  - name: loki-push
+    tags: [app:loki]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    paths: [~/loki/api/v1/push$]
+    plugins:
+    - name: acl
+      instance_name: loki-push-acl
+      config:
+        allow: [loki-push]
+        hide_groups_header: true
+  - name: loki-read
+    tags: [app:loki]
+    preserve_host: true
+    strip_path: false
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    protocols: [https]
+    hosts: [jithendar.com]
+    # Regex and prefix paths in one route are split by Kong's router; both keep this route's plugins.
+    paths:
+    - "~/loki/api/v1/(?:query_range|labels|format_query)$"
+    - "~/loki/api/v1/label$"
+    - /loki/api/v1/label/
+    plugins:
+    - name: acl
+      instance_name: loki-read-acl
+      config:
+        allow: [loki-read]
+        hide_groups_header: true

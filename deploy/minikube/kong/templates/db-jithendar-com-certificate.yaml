@@ -1,0 +1,17 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: db-jithendar-com
+  namespace: kong
+  labels:
+    app.kubernetes.io/part-of: kong-gateway
+spec:
+  secretName: db-jithendar-com-tls
+  dnsNames:
+  - db.jithendar.com
+  privateKey:
+    rotationPolicy: Always
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: letsencrypt-prod

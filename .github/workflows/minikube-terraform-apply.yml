@@ -1,0 +1,104 @@
+name: Apply minikube infrastructure
+
+# Applies minikube-infrastructure/ (Helm releases on mk4) on pushes to master. Pull requests are checked by
+# minikube-terraform-check.yml. Off until repository variable MINIKUBE_TERRAFORM_APPLY is "true": set it after the
+# one-time move of the live add-ons (minikube-infrastructure/README.md), never before.
+#
+# Access, all set by scripts/setup-minikube-terraform-ci.sh:
+#   mk4    ServiceAccount kube-system/github-minikube-terraform; kubeconfig template .github/mk4-terraform-kubeconfig.yaml
+#          filled from MK4_API_SERVER, MK4_CA_DATA (variables) and MK4_TERRAFORM_TOKEN (secret of environment mk4).
+#   state  AWS role MK4_TERRAFORM_ROLE_ARN through GitHub OIDC (infrastructure/github-minikube-terraform.tf):
+#          the S3 state object and its lock, nothing else.
+# Runs on GitHub-hosted runners, never on the mk4 server (runner/README.md).
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'minikube-infrastructure/**'
+      - 'deploy/minikube/argocd/values.yaml'
+      - 'deploy/minikube/cert-manager/values.yaml'
+      - 'deploy/minikube/metrics-server/values.yaml'
+      - 'deploy/minikube/kong/**'
+      - '.github/mk4-terraform-kubeconfig.yaml'
+      - '.github/workflows/minikube-terraform-apply.yml'
+
+permissions:
+  contents: read
+
+# Never cancel an active apply: Helm would leave a release pending.
+concurrency:
+  group: terraform-minikube-mk4
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    if: github.ref == 'refs/heads/master' && vars.MINIKUBE_TERRAFORM_APPLY == 'true'
+    runs-on: ubuntu-latest
+    environment: mk4
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      AWS_REGION: us-east-1
+      TF_IN_AUTOMATION: 'true'
+      TF_INPUT: 'false'
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.6
+          terraform_wrapper: false
+
+      - name: AWS credentials (state only)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.MK4_TERRAFORM_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Kubeconfig for mk4
+        env:
+          MK4_API_SERVER: ${{ vars.MK4_API_SERVER }}
+          MK4_CA_DATA: ${{ vars.MK4_CA_DATA }}
+          MK4_TERRAFORM_TOKEN: ${{ secrets.MK4_TERRAFORM_TOKEN }}
+        run: |
+          set -euo pipefail
+          for v in MK4_API_SERVER MK4_CA_DATA MK4_TERRAFORM_TOKEN; do
+            [[ -n "${!v}" ]] || { echo "::error::$v is not set; run scripts/setup-minikube-terraform-ci.sh"; exit 1; }
+          done
+          (umask 077; perl -pe 's/\$\{(MK4_[A-Z_]+)\}/$ENV{$1}/g' .github/mk4-terraform-kubeconfig.yaml > "$RUNNER_TEMP/kubeconfig")
+          echo "TF_VAR_kubeconfig_path=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      - name: terraform format check
+        run: terraform -chdir=minikube-infrastructure fmt -check -recursive
+
+      - name: terraform init & validate
+        run: |
+          terraform -chdir=minikube-infrastructure init -input=false -no-color
+          terraform -chdir=minikube-infrastructure validate -no-color
+
+      - name: terraform test
+        run: terraform -chdir=minikube-infrastructure test -no-color -var-file=vars/mk4.tfvars
+
+      - name: terraform plan
+        run: |
+          umask 077
+          terraform -chdir=minikube-infrastructure plan -input=false -no-color -lock-timeout=5m \
+            -var-file=vars/mk4.tfvars -out=tf.tfplan
+
+      - name: terraform apply
+        run: terraform -chdir=minikube-infrastructure apply -input=false -no-color -lock-timeout=5m tf.tfplan
+
+      # The plan and the kubeconfig hold credentials; do not leave them on the runner.
+      - name: remove plan and kubeconfig
+        if: always()
+        run: rm -f minikube-infrastructure/tf.tfplan "$RUNNER_TEMP/kubeconfig"

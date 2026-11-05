@@ -1,0 +1,20 @@
+# mk4's only StorageClass, "standard" (k8s.io/minikube-hostpath), has reclaimPolicy Delete: deleting the PVC
+# would delete Kong's database. This class uses the same provisioner with Retain, so the PV and its hostPath
+# directory survive a deleted PVC. StorageClasses are immutable; to change it, delete and recreate it (bound PVs
+# keep the policy they were created with).
+#
+# hostPath volumes have no node affinity: the data lives on whichever node first ran the pod. postgres.yaml pins
+# the pod to one node for that reason.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard-retain
+  labels:
+    app.kubernetes.io/part-of: kong-gateway
+  annotations:
+    # helm uninstall (or terraform destroy) leaves this object in place.
+    helm.sh/resource-policy: keep
+provisioner: k8s.io/minikube-hostpath
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: false

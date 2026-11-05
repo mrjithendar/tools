@@ -1,0 +1,322 @@
+# Cleaned export from mk4 on 2026-11-05 (uid, resourceVersion, managedFields, status removed). Reference for rollback.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: moks-routing:traefik.io/IngressRoute:moks/opensearch
+  labels:
+    app.kubernetes.io/instance: moks
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: moks
+    app.kubernetes.io/version: 0.1.0
+  name: opensearch
+  namespace: moks
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - kind: Rule
+    match: Host(`jithendar.com`) && (Path(`/opensearch`) || PathPrefix(`/opensearch/`))
+      && (Method(`GET`) || Method(`HEAD`) || (Method(`POST`) && PathRegexp(`^/opensearch(/[^/]+)?/_(search|msearch|count)$`)))
+    middlewares:
+    - name: opensearch-auth
+    - name: opensearch-strip-prefix
+    services:
+    - name: moks-opensearch
+      port: http
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: moks-routing:traefik.io/IngressRoute:moks/opensearch-dashboards
+  labels:
+    app.kubernetes.io/instance: moks
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: moks
+    app.kubernetes.io/version: 0.1.0
+  name: opensearch-dashboards
+  namespace: moks
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - kind: Rule
+    match: Host(`jithendar.com`) && (Path(`/opensearch-dashboards`) || PathPrefix(`/opensearch-dashboards/`))
+    middlewares:
+    - name: opensearch-dashboards-auth
+    services:
+    - name: moks-opensearch-dashboards
+      port: http
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: jithendar-db
+  namespace: jithendar
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - match: HostSNI(`db.jithendar.com`)
+    middlewares:
+    - name: db-allowlist
+    services:
+    - name: jithendar-postgres
+      port: 5432
+  tls:
+    options:
+      name: db-postgres
+    secretName: db-jithendar-com-tls
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: argocd-https
+  namespace: argocd
+spec:
+  redirectScheme:
+    permanent: true
+    scheme: https
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: compress
+  namespace: jithendar
+spec:
+  compress:
+    encodings:
+    - zstd
+    - br
+    - gzip
+    includedContentTypes:
+    - text/html
+    - text/css
+    - text/plain
+    - text/xml
+    - text/javascript
+    - application/javascript
+    - application/json
+    - application/xml
+    - application/rss+xml
+    - application/manifest+json
+    - image/svg+xml
+    minResponseBodyBytes: 1024
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: db-allowlist
+  namespace: jithendar
+spec:
+  ipAllowList:
+    sourceRange:
+    - 122.177.247.138/32
+    - 46.224.38.14/32
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: db-headers
+  namespace: jithendar
+spec:
+  headers:
+    contentTypeNosniff: true
+    customResponseHeaders:
+      Cache-Control: no-store
+      X-Robots-Tag: noindex, nofollow
+    frameDeny: true
+    referrerPolicy: no-referrer
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: db-slash
+  namespace: jithendar
+spec:
+  redirectRegex:
+    permanent: false
+    regex: ^https://jithendar\.com/db$
+    replacement: https://jithendar.com/db/
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: https-redirect
+  namespace: jithendar
+spec:
+  redirectScheme:
+    permanent: true
+    scheme: https
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-trace-headers
+  namespace: jithendar
+spec:
+  headers:
+    customRequestHeaders:
+      baggage: ''
+      traceparent: ''
+      tracestate: ''
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: www-redirect
+  namespace: jithendar
+spec:
+  redirectRegex:
+    permanent: true
+    regex: ^https?://www\.jithendar\.com/(.*)
+    replacement: https://jithendar.com/${1}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: moks-routing:traefik.io/Middleware:moks/https-redirect
+  labels:
+    app.kubernetes.io/instance: moks
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: moks
+    app.kubernetes.io/version: 0.1.0
+  name: https-redirect
+  namespace: moks
+spec:
+  redirectScheme:
+    permanent: true
+    scheme: https
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: moks-routing:traefik.io/Middleware:moks/opensearch-auth
+  labels:
+    app.kubernetes.io/instance: moks
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: moks
+    app.kubernetes.io/version: 0.1.0
+  name: opensearch-auth
+  namespace: moks
+spec:
+  basicAuth:
+    removeHeader: true
+    secret: moks-opensearch-auth
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: moks-routing:traefik.io/Middleware:moks/opensearch-dashboards-auth
+  labels:
+    app.kubernetes.io/instance: moks
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: moks
+    app.kubernetes.io/version: 0.1.0
+  name: opensearch-dashboards-auth
+  namespace: moks
+spec:
+  basicAuth:
+    removeHeader: true
+    secret: moks-opensearch-dashboards-auth
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: moks-routing:traefik.io/Middleware:moks/opensearch-strip-prefix
+  labels:
+    app.kubernetes.io/instance: moks
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: moks
+    app.kubernetes.io/version: 0.1.0
+  name: opensearch-strip-prefix
+  namespace: moks
+spec:
+  stripPrefix:
+    prefixes:
+    - /opensearch
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: loki:traefik.io/Middleware:monitoring/loki-push-auth
+  name: loki-push-auth
+  namespace: monitoring
+spec:
+  basicAuth:
+    removeHeader: true
+    secret: loki-push-auth
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: loki:traefik.io/Middleware:monitoring/loki-read-auth
+  name: loki-read-auth
+  namespace: monitoring
+spec:
+  basicAuth:
+    removeHeader: true
+    secret: loki-read-auth
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: prometheus:traefik.io/Middleware:monitoring/prometheus-auth
+  name: prometheus-auth
+  namespace: monitoring
+spec:
+  basicAuth:
+    removeHeader: true
+    secret: monitoring-auth
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: prometheus:traefik.io/Middleware:monitoring/prometheus-remote-write-auth
+  name: prometheus-remote-write-auth
+  namespace: monitoring
+spec:
+  basicAuth:
+    removeHeader: true
+    secret: prometheus-remote-write-auth
+---
+apiVersion: traefik.io/v1alpha1
+kind: MiddlewareTCP
+metadata:
+  name: db-allowlist
+  namespace: jithendar
+spec:
+  ipAllowList:
+    sourceRange:
+    - 122.177.247.138/32
+    - 46.224.38.14/32
+---
+apiVersion: traefik.io/v1alpha1
+kind: TLSOption
+metadata:
+  name: db-postgres
+  namespace: jithendar
+spec:
+  alpnProtocols:
+  - postgresql
+  minVersion: VersionTLS12
+---
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+  namespace: jithendar
+spec:
+  defaultCertificate:
+    secretName: jithendar-com-tls

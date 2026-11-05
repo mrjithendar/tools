@@ -1,0 +1,83 @@
+# Kong proxy: public ports from anywhere (NodePort traffic arrives from node addresses after kube-proxy).
+# Admin (8001) and Manager (8002) are absent on purpose: no network path is allowed to them. The test ports
+# 8180/8543 are absent too; kubectl port-forward does not traverse the pod network.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kong
+  namespace: kong
+  labels:
+    app.kubernetes.io/part-of: kong-gateway
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kong
+  policyTypes: [Ingress, Egress]
+  ingress:
+  - ports:
+    - {port: 8000, protocol: TCP}
+    - {port: 8443, protocol: TCP}
+    - {port: 9443, protocol: TCP}
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+    ports:
+    - {port: 8007, protocol: TCP}
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - {port: 53, protocol: UDP}
+    - {port: 53, protocol: TCP}
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kong-postgres
+    ports:
+    - {port: 5432, protocol: TCP}
+  # Upstreams, by namespace and container port (Services resolve to these pod ports).
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: jithendar
+    ports:
+    - {port: 3000, protocol: TCP}   # jithendar-com
+    - {port: 8080, protocol: TCP}   # jithendar-db-ui (Adminer)
+    - {port: 5432, protocol: TCP}   # jithendar-postgres (db.jithendar.com)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: moks
+    ports:
+    - {port: 8080, protocol: TCP}   # moks-api, moks-terminal
+    - {port: 9200, protocol: TCP}   # moks-opensearch
+    - {port: 5601, protocol: TCP}   # moks-opensearch-dashboards
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: argocd
+    ports:
+    - {port: 8080, protocol: TCP}   # argocd-server
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+    ports:
+    - {port: 3000, protocol: TCP}   # grafana
+    - {port: 3100, protocol: TCP}   # loki
+    - {port: 9090, protocol: TCP}   # prometheus
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: roboshop-ai
+      podSelector:
+        matchLabels:
+          app: web
+    ports:
+    - {port: 8080, protocol: TCP}   # RoboShop storefront (kong-config/seed/roboshop.yaml), once it runs on mk4

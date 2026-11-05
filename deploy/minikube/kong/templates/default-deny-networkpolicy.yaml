@@ -1,0 +1,15 @@
+# mk4's CNI (kindnet v20260820) enforces NetworkPolicy: jithendar.com recorded a blocked flow on 2026-11-02
+# (jithendar.com/minikube/practice-executor-50-networkpolicies.yaml). Treat these as a second layer anyway: the
+# Admin API and Kong Manager are bound to the pod's loopback, which no policy is needed to protect.
+#
+# Default deny for the namespace, then explicit allows.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: kong
+  labels:
+    app.kubernetes.io/part-of: kong-gateway
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]

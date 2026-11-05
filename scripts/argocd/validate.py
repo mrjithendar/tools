@@ -90,7 +90,7 @@ def validate(external=False):
         assert 'FailOnSharedResource=true' in spec['syncPolicy']['syncOptions']
         for resource in render(app,external):
             kind=resource['kind'];meta=resource['metadata'];namespace=meta.get('namespace','')
-            cluster_kind=kind in ('Namespace','ClusterRole','ClusterRoleBinding','CustomResourceDefinition','APIService','ClusterIssuer','MutatingWebhookConfiguration','ValidatingWebhookConfiguration')
+            cluster_kind=kind in ('Namespace','ClusterRole','ClusterRoleBinding','CustomResourceDefinition','APIService','ClusterIssuer','StorageClass','MutatingWebhookConfiguration','ValidatingWebhookConfiguration')
             if not namespace and not cluster_kind:namespace=spec['destination']['namespace']
             assert namespace not in ('argocd','traefik') or (name=='loki' and namespace=='traefik' and kind in ('Role','RoleBinding')),(name,kind,meta['name'])
             if kind=='Secret':

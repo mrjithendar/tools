@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kong-postgres
+  namespace: kong
+  labels:
+    app.kubernetes.io/name: kong-postgres
+    app.kubernetes.io/part-of: kong-gateway
+spec:
+  serviceName: kong-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kong-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kong-postgres
+        app.kubernetes.io/part-of: kong-gateway
+    spec:
+      # Lowest CPU and memory requests among the workers on 2026-11-05 (docs/kong/00-discovery.md).
+      nodeSelector:
+        kubernetes.io/hostname: mk4-m03
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
+      # hostPath volumes ignore fsGroup and arrive root-owned; hand the directory to uid 70 (postgres in the
+      # alpine image) once. Same pattern as moks-postgres on mk4.
+      initContainers:
+      - name: volume-permissions
+        image: postgres:17.11-alpine
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - >-
+          mkdir -p /var/lib/postgresql/data/pgdata &&
+          chown 70:70 /var/lib/postgresql/data /var/lib/postgresql/data/pgdata &&
+          chmod 0700 /var/lib/postgresql/data/pgdata
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+          runAsGroup: 0
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+            add: [CHOWN, FOWNER]
+        resources:
+          requests: {cpu: 10m, memory: 16Mi}
+          limits: {cpu: 100m, memory: 64Mi}
+        volumeMounts:
+        - {name: data, mountPath: /var/lib/postgresql/data}
+      containers:
+      - name: postgres
+        image: postgres:17.11-alpine
+        imagePullPolicy: IfNotPresent
+        # Sized for the 512Mi limit: shared_buffers 25 %, effective_cache_size ~60 %, small work_mem because
+        # Kong's queries are short. huge_pages off: containers cannot rely on them.
+        args:
+        - -c
+        - shared_buffers=128MB
+        - -c
+        - effective_cache_size=320MB
+        - -c
+        - work_mem=4MB
+        - -c
+        - maintenance_work_mem=32MB
+        - -c
+        - wal_buffers=4MB
+        - -c
+        - max_connections=40
+        - -c
+        - huge_pages=off
+        - -c
+        - min_wal_size=80MB
+        - -c
+        - max_wal_size=512MB
+        - -c
+        - checkpoint_completion_target=0.9
+        - -c
+        - password_encryption=scram-sha-256
+        - -c
+        - log_min_duration_statement=1000
+        env:
+        - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+        - {name: POSTGRES_USER, value: postgres}
+        - {name: POSTGRES_DB, value: postgres}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef: {name: kong-postgres, key: superuser-password}
+        - name: KONG_DB_PASSWORD
+          valueFrom:
+            secretKeyRef: {name: kong-postgres, key: kong-password}
+        ports:
+        - {name: postgres, containerPort: 5432}
+        readinessProbe:
+          exec:
+            command: [pg_isready, -h, 127.0.0.1, -U, postgres, -d, postgres]
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          exec:
+            command: [pg_isready, -h, 127.0.0.1, -U, postgres, -d, postgres]
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 6
+        resources:
+          requests: {cpu: 100m, memory: 256Mi}
+          limits: {cpu: 500m, memory: 512Mi}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+        volumeMounts:
+        - {name: data, mountPath: /var/lib/postgresql/data}
+        - {name: init, mountPath: /docker-entrypoint-initdb.d, readOnly: true}
+        - {name: run, mountPath: /var/run/postgresql}
+        - {name: tmp, mountPath: /tmp}
+        - {name: shm, mountPath: /dev/shm}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: kong-postgres-data
+      - name: init
+        configMap:
+          name: kong-postgres-init
+          defaultMode: 0555
+      - name: run
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+      - name: shm
+        emptyDir: {medium: Memory, sizeLimit: 64Mi}

@@ -1,0 +1,15 @@
+# Status API (probes, and /metrics once the prometheus plugin is enabled). Scrapable from monitoring only.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-status
+  namespace: kong
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: kong-gateway
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: kong
+  ports:
+  - {name: status, port: 8007, targetPort: status}

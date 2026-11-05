@@ -31,7 +31,7 @@ kubectl --context mk4 apply -f deploy/eks/applications/
 ./deploy-argocd.sh status --context mk4                         # warns about Minikube apps with stale specs
 
 # 2. Align and sync the Minikube apps. This only re-applies what Git already has, without prune.
-./deploy-argocd.sh metrics-server grafana prometheus loki --context mk4
+./deploy-argocd.sh grafana prometheus loki --context mk4
 
 # 3. Check the EKS apps show no change, then sync them.
 for a in letsencrypt-issuers ingress bootstrap; do

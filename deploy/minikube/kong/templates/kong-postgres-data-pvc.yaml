@@ -1,0 +1,26 @@
+# Kong's dedicated PostgreSQL: one replica, official image, its own database "kong" owned by the
+# non-superuser role "kong". Credentials come from Secret kong-postgres (create-secrets.sh), never from Git.
+#
+# Persistence, in layers:
+#   - a standalone PVC (not a volumeClaimTemplate), so the release owns it and the annotation below applies;
+#   - helm.sh/resource-policy: keep: uninstalling the release (terraform destroy) never deletes it;
+#   - StorageClass standard-retain: deleting the PVC by hand still keeps the PV and the hostPath directory;
+#   - nodeSelector: minikube-hostpath volumes have no node affinity, so the pod must always return to the node
+#     that holds the directory. Moving it means moving the data (docs/kong/05-backup-restore.md).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kong-postgres-data
+  namespace: kong
+  labels:
+    app.kubernetes.io/name: kong-postgres
+    app.kubernetes.io/part-of: kong-gateway
+  annotations:
+    # helm uninstall (or terraform destroy) leaves this object in place.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: standard-retain
+  resources:
+    requests:
+      storage: 2Gi

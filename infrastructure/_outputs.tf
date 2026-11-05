@@ -93,3 +93,8 @@ output "eks_load_balancer_controller_role_arn" {
   description = "Pod Identity role of the AWS Load Balancer Controller; null when eks_ingress_enabled is false."
   value       = try(aws_iam_role.eks_load_balancer_controller[0].arn, null)
 }
+
+output "github_minikube_terraform_role_arn" {
+  description = "Set as repository variable MK4_TERRAFORM_ROLE_ARN (scripts/setup-minikube-terraform-ci.sh)."
+  value       = aws_iam_role.github_minikube_terraform.arn
+}

@@ -2,8 +2,6 @@
 import argparse
 import json
 import os
-import re
-import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -13,8 +11,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/lib'))
-from repos import CATALOGS, MONITORING_ARGOCD  # noqa: E402
-ARGOCD_CHART_VERSION = '10.10.5'
+from repos import CATALOGS  # noqa: E402
+TERRAFORM = 'minikube-infrastructure'
 
 
 def catalog():
@@ -62,16 +60,12 @@ def main():
         './deploy-argocd.sh status. Requires kubectl and Python with PyYAML. '
         'Apps deploy their configured Git revision; commit/push workload changes first.')
     parser.add_argument('apps', nargs='*', default=['all'],
-                        help='install, app names, all, list, or status (default: all)')
+                        help='app names, all, list, or status (default: all)')
     parser.add_argument('--context', default=os.getenv('KUBE_CONTEXT', 'mk4'))
     parser.add_argument('--dry-run', action='store_true', help='Print selection without accessing the cluster')
     parser.add_argument('--timeout', type=int, default=600, help='Seconds to wait for Synced/Healthy (default 600)')
     args = parser.parse_args()
     apps, projects = catalog()
-    # Legacy explicit selection supports repairing an existing Argo-managed
-    # cert-manager. It is never included by 'all' on a fresh Helm bootstrap.
-    if 'cert-manager' in args.apps:
-        apps['cert-manager'] = yaml.safe_load((MONITORING_ARGOCD / 'cert-manager.yaml').read_text())
     if args.apps == ['list']:
         print('all: every Application registered in tools/deploy/minikube/applications')
         print('Available apps: ' + ' '.join(sorted(apps)))
@@ -80,19 +74,16 @@ def main():
         parser.error('--timeout must be positive')
     selected = list(dict.fromkeys(name for item in args.apps
                                   for name in (sorted(apps) if item == 'all' else [item])))
-    if 'install' in args.apps and args.apps != ['install']:
-        parser.error('Run install separately before selecting applications')
-    if args.apps not in (['status'], ['install']):
+    if 'install' in args.apps:
+        parser.error(f'Argo CD is a Terraform Helm release: terraform -chdir={TERRAFORM} apply')
+    if args.apps != ['status']:
         unknown = set(selected) - apps.keys()
         if unknown:
             parser.error('Unknown apps: ' + ', '.join(sorted(unknown)))
     if args.dry_run:
         print(f'Context: {args.context}; action: ' + ' '.join(selected))
-        if args.apps == ['install']:
-            print(f'Install Argo CD chart {ARGOCD_CHART_VERSION} if absent; reuse existing Helm release. No applications or ingress deployed.')
-        else:
-            print('Install Argo CD if missing, create missing projects/apps, align existing app project/source/destination with Git '
-                  '(other settings preserved), sync without pruning, wait for health; apps tracking no resources fail.')
+        print('Create missing projects/apps, align existing app project/source/destination with Git '
+              '(other settings preserved), sync without pruning, wait for health; apps tracking no resources fail.')
         return
     kube = ['kubectl', '--context', args.context, '--request-timeout=20s', '-n', 'argocd']
 
@@ -100,52 +91,10 @@ def main():
         return subprocess.check_output(kube + list(command), text=True,
                                        input=json.dumps(body) if body is not None else None)
 
-    def install_controller():
-        if not shutil.which('helm'):
-            raise RuntimeError('Helm is required to install Argo CD. Install Kubernetes Helm first.')
-        helm = ['helm', '--kube-context', args.context, '--namespace', 'argocd']
-        # Helm 3 needs --all to include pending/uninstalled releases; Helm 4
-        # lists every status by default and removed that flag. Match the exact
-        # option, not --all-namespaces, so an existing release is never hidden.
-        list_help = subprocess.check_output(['helm', 'list', '--help'], text=True)
-        status_flags = ['--all'] if re.search(r'(?m)^\s*(?:-a,\s*)?--all\s', list_help) else []
-        releases = json.loads(subprocess.check_output(
-            helm + ['list', *status_flags, '--filter', '^argocd$', '-o', 'json'], text=True))
-        if releases:
-            release_status = releases[0]['status']
-            if release_status not in ('deployed', 'pending-install'):
-                raise RuntimeError('Existing argocd Helm release is not deployed; inspect helm status argocd before retrying. No changes made.')
-            if release_status == 'pending-install':
-                print('Helm reports pending-install; verifying existing Argo CD workloads without changing release metadata.')
-                for workload in ('deployment/argocd-server', 'deployment/argocd-repo-server',
-                                 'deployment/argocd-redis', 'statefulset/argocd-application-controller'):
-                    run('rollout', 'status', workload, f'--timeout={args.timeout}s')
-                print('Existing controllers are ready. Helm remains pending-install; resolve that release state before future Helm upgrades.')
-            print('Reusing existing Argo CD Helm release; values and version unchanged.')
-        else:
-            existing = run('get', 'crd', 'applications.argoproj.io', '--ignore-not-found', '-o', 'name')
-            if existing.strip():
-                raise RuntimeError('Argo CD CRDs already exist without the argocd Helm release. Refusing automatic adoption; inspect the existing installation.')
-            subprocess.check_call(helm + [
-                'install', 'argocd', 'argo-cd',
-                '--repo', 'https://argoproj.github.io/argo-helm',
-                '--version', ARGOCD_CHART_VERSION, '--create-namespace',
-                '--values', str(ROOT / 'deploy/minikube/argocd/values.yaml'),
-                '--wait', '--timeout', f'{args.timeout}s'])
-        for crd in ('applications.argoproj.io', 'appprojects.argoproj.io'):
-            run('wait', '--for=condition=Established', f'crd/{crd}', f'--timeout={args.timeout}s')
-        print('Argo CD is installed. Public HTTPS ingress is configured separately.')
-
-    if args.apps == ['install']:
-        install_controller()
-        return
     for crd in ('applications.argoproj.io', 'appprojects.argoproj.io'):
         if not run('get', 'crd', crd, '--ignore-not-found', '-o', 'name').strip():
-            if args.apps == ['status']:
-                raise RuntimeError(f'Argo CD is not installed in context {args.context}. Run ./deploy-argocd.sh to install and deploy.')
-            print('Argo CD is missing; installing the controller before deploying applications.')
-            install_controller()
-            break
+            raise RuntimeError(f'Argo CD is not installed in context {args.context}. Install it with Terraform first: '
+                               f'terraform -chdir={TERRAFORM} apply ({TERRAFORM}/README.md).')
     if args.apps == ['status']:
         print(run('get', 'applications'), end='')
         for app in json.loads(run('get', 'applications', '-o', 'json'))['items']:

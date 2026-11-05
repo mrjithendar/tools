@@ -23,28 +23,20 @@ class LokiTests(unittest.TestCase):
         binding=next(d for d in docs if d['kind']=='ClusterRoleBinding')
         self.assertEqual(binding['subjects'],[{'kind':'ServiceAccount','name':'alloy','namespace':'monitoring'}])
 
-    def test_public_route_is_authenticated_and_read_only(self):
+    def test_public_routes_are_kong_routes_with_separate_logins(self):
+        # Traefik objects left Git with the move to Kong (traefik-backup-conf/); the routes are in the Kong seed.
         docs=list(yaml.safe_load_all(subprocess.check_output(['kubectl','kustomize',str(ROOT/'deploy/minikube/observability/loki')],text=True)))
-        ingress=next(d for d in docs if d['kind']=='Ingress' and d['metadata']['name']=='loki-read')
-        self.assertEqual({d['metadata']['name'] for d in docs if d['kind']=='Ingress'},{'loki-read','loki-push'})
-        self.assertEqual(ingress['metadata']['annotations']['traefik.ingress.kubernetes.io/router.middlewares'],'monitoring-loki-read-auth@kubernetescrd')
-        paths={p['path']:p['pathType'] for r in ingress['spec']['rules'] for p in r['http']['paths']}
-        self.assertEqual(paths,{'/loki/api/v1/query_range':'Exact','/loki/api/v1/labels':'Exact','/loki/api/v1/format_query':'Exact','/loki/api/v1/label':'Prefix'})
-        middleware=next(d for d in docs if d['kind']=='Middleware' and d['metadata']['name']=='loki-read-auth')
-        self.assertEqual(middleware['spec']['basicAuth']['secret'],'loki-read-auth')
-        self.assertNotEqual(middleware['spec']['basicAuth']['secret'],'monitoring-auth')
-        project=yaml.safe_load((ROOT/'deploy/minikube/applications/project-observability.yaml').read_text())
-        allowed={(r['group'],r['kind']) for r in project['spec']['namespaceResourceWhitelist']}
-        self.assertLessEqual({('networking.k8s.io','Ingress'),('traefik.io','Middleware')},allowed)
-
-    def test_push_route_is_authenticated_and_push_only(self):
-        docs=list(yaml.safe_load_all(subprocess.check_output(['kubectl','kustomize',str(ROOT/'deploy/minikube/observability/loki')],text=True)))
-        ingress=next(d for d in docs if d['kind']=='Ingress' and d['metadata']['name']=='loki-push')
-        self.assertEqual(ingress['metadata']['annotations']['traefik.ingress.kubernetes.io/router.middlewares'],'monitoring-loki-push-auth@kubernetescrd')
-        paths={p['path']:p['pathType'] for r in ingress['spec']['rules'] for p in r['http']['paths']}
-        self.assertEqual(paths,{'/loki/api/v1/push':'Exact'})
-        middleware=next(d for d in docs if d['kind']=='Middleware' and d['metadata']['name']=='loki-push-auth')
-        self.assertEqual(middleware['spec']['basicAuth']['secret'],'loki-push-auth')
+        self.assertFalse(any(d['kind'] in ('Ingress','Middleware','IngressRoute') for d in docs))
+        seed=yaml.safe_load((ROOT/'kong-config/seed/kong.yaml').read_text())
+        loki=next(s for s in seed['services'] if s['name']=='loki')
+        self.assertEqual(loki['host'],'loki.monitoring.svc.cluster.local')
+        self.assertEqual([p['name'] for p in loki['plugins']],['basic-auth'])
+        self.assertTrue(loki['plugins'][0]['config']['hide_credentials'])
+        routes={r['name']:r for r in loki['routes']}
+        self.assertEqual(routes['loki-push']['paths'],['~/loki/api/v1/push$'])
+        self.assertEqual(routes['loki-read']['paths'],['~/loki/api/v1/(?:query_range|labels|format_query)$','~/loki/api/v1/label$','/loki/api/v1/label/'])
+        groups={name:r['plugins'][0]['config']['allow'] for name,r in routes.items()}
+        self.assertEqual(groups,{'loki-push':['loki-push'],'loki-read':['loki-read']})
 
     def test_eks_alloy_differs_from_mk4_only_in_destination(self):
         mk4=(ROOT/'deploy/minikube/observability/loki/config.alloy').read_text()

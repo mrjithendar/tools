@@ -1,0 +1,61 @@
+# RoboShop storefront at https://jithendar.com/roboshop/: a REFERENCE COPY, imported once by hand with decK, and
+# only once RoboShop runs on mk4 (today nothing does: its manifests target the deleted roboshop-demo EKS cluster).
+# Imported before then, the route answers 503 (no upstream), so keep it out until web is Ready on mk4.
+# docs/kong/08-roboshop.md has the steps. Same rules as kong.yaml: Kong's database owns these entities after
+# import; never `deck gateway sync` against the live gateway except during a deliberate restore.
+#
+# Reproduces the EKS routing (tools deploy/eks/manifests/ingress/roboshop-virtualservice.yaml, Istio):
+#   exact /roboshop   -> 308 redirect to /roboshop/
+#   prefix /roboshop/ -> rewrite to /, web.roboshop-ai:8080
+# Host jithendar.com only; eks.jithendar.com belonged to the deleted cluster. The Kiali route is not carried over
+# (no Istio on mk4).
+#
+# Its own select tag, so it is validated, diffed and applied apart from kong.yaml (seed:v1); the global
+# pre-function in kong.yaml (client X-Forwarded-* removal) applies to these routes too.
+_format_version: "3.0"
+_info:
+  select_tags:
+  - seed:roboshop-v1
+
+services:
+- name: roboshop-web
+  tags: [app:roboshop]
+  protocol: http
+  host: web.roboshop-ai.svc.cluster.local
+  port: 8080
+  connect_timeout: 10000
+  # web's own nginx gives the API 35 s (services/web/nginx/snippets/proxy.conf); Kong waits longer than that so
+  # the storefront, not the gateway, decides when a call has failed.
+  read_timeout: 60000
+  write_timeout: 60000
+  retries: 2
+  routes:
+  - name: roboshop
+    tags: [app:roboshop]
+    protocols: [https]
+    hosts: [jithendar.com]
+    paths: [/roboshop/]
+    # "/roboshop/products/x" -> "/products/x"; "/roboshop/" -> "/" (Istio: rewrite uri "/").
+    strip_path: true
+    preserve_host: true
+    https_redirect_status_code: 301
+    request_buffering: true
+    # web proxies the shop API unbuffered (proxy_buffering off); keep streaming end to end.
+    response_buffering: false
+  - name: roboshop-slash
+    tags: [app:roboshop]
+    protocols: [https]
+    hosts: [jithendar.com]
+    paths: [~/roboshop$]
+    strip_path: false
+    preserve_host: true
+    https_redirect_status_code: 301
+    request_buffering: true
+    response_buffering: false
+    plugins:
+    - name: redirect
+      instance_name: roboshop-add-slash
+      config:
+        status_code: 308
+        location: https://jithendar.com/roboshop/
+        keep_incoming_path: false

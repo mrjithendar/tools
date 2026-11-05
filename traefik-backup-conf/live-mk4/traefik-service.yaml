@@ -1,0 +1,39 @@
+# Cleaned export from mk4 on 2026-11-05 (uid, resourceVersion, managedFields, status removed). Reference for rollback.
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    meta.helm.sh/release-name: traefik
+    meta.helm.sh/release-namespace: traefik
+  labels:
+    app.kubernetes.io/instance: traefik-traefik
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: traefik
+    helm.sh/chart: traefik-42.0.0
+  name: traefik
+  namespace: traefik
+spec:
+  clusterIP: 10.102.158.179
+  clusterIPs:
+  - 10.102.158.179
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: web
+    nodePort: 30080
+    port: 80
+    protocol: TCP
+    targetPort: web
+  - name: websecure
+    nodePort: 30443
+    port: 443
+    protocol: TCP
+    targetPort: websecure
+  selector:
+    app.kubernetes.io/instance: traefik-traefik
+    app.kubernetes.io/name: traefik
+  sessionAffinity: None
+  type: NodePort

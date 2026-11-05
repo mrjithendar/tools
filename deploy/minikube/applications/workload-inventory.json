@@ -1,11 +1,6 @@
 [
   [
     "Deployment",
-    "kube-system",
-    "metrics-server"
-  ],
-  [
-    "Deployment",
     "monitoring",
     "alloy"
   ],

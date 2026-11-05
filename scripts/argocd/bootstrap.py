@@ -1,4 +1,4 @@
-"""Install cluster controllers in order; never implicitly deploy business apps."""
+"""Prepare mk4 after Terraform: credentials, Traefik, Argo CD ingress; never implicitly deploy business apps."""
 import argparse
 import base64
 import os
@@ -13,8 +13,13 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = Path(os.environ.get('ROBOSHOP_AI_DIR', ROOT.parent / 'roboshop-ai')).resolve()
+# cert-manager, metrics-server, Argo CD and Kong are Helm releases owned by Terraform.
+TERRAFORM = 'minikube-infrastructure'
+TERRAFORM_WORKLOADS = (
+    ('cert-manager', ('cert-manager', 'cert-manager-webhook', 'cert-manager-cainjector')),
+    ('argocd', ('argocd-server', 'argocd-repo-server')),
+)
 CONTROLLERS = (
-    ('cert-manager', 'https://charts.jetstack.io', 'v1.20.4', 'cert-manager'),
     ('traefik', 'https://traefik.github.io/charts', '42.0.0', 'traefik'),
 )
 
@@ -128,8 +133,8 @@ def main():
         print('Create missing internal roboshop-secrets; preserve existing credentials.')
         print(f'Context {args.context}: refresh ECR credentials in managed namespaces (excluding kube-system).')
         if not args.pull_secrets_only:
-            print('Then cert-manager -> Traefik -> Argo CD -> Argo CD ingress')
-        print('Existing Helm releases are reused; no upgrades or ownership adoption.')
+            print(f'Then check the Terraform releases cert-manager and Argo CD ({TERRAFORM}) -> Traefik -> Argo CD ingress')
+        print('An existing Traefik release is reused; no upgrades or ownership adoption.')
         if args.schedule_pull_secrets:
             print('Install six-hour ECR refresh CronJob; requires AWS keys in roboshop-secrets.')
         if args.deploy_apps:
@@ -167,20 +172,16 @@ def main():
     kube = ['kubectl', '--context', args.context, '--request-timeout=20s']
     def read(*parts):
         return subprocess.check_output(kube + list(parts), text=True)
-    # Preserve existing Argo ownership, including partially installed CRDs.
-    cert_managed_by_argo = False
     read('get', 'namespace', 'kube-system', '-o', 'name')
-    if read('get', 'crd', 'applications.argoproj.io', '--ignore-not-found', '-o', 'name').strip():
-        owned = read('-n', 'argocd', 'get', 'application', 'cert-manager', '--ignore-not-found', '-o', 'name')
-        if owned.strip():
-            cert_managed_by_argo = True
+    for namespace, deployments in TERRAFORM_WORKLOADS:
+        for deployment in deployments:
+            if not read('-n', namespace, 'get', 'deployment', deployment, '--ignore-not-found', '-o', 'name').strip():
+                raise RuntimeError(f'{namespace}/{deployment} is missing. Install the cluster add-ons with Terraform first: '
+                                   f'terraform -chdir={TERRAFORM} apply ({TERRAFORM}/README.md).')
+            subprocess.check_call(kube + ['-n', namespace, 'rollout', 'status', f'deployment/{deployment}', f'--timeout={args.timeout}s'])
     help_text = subprocess.check_output(['helm', 'list', '--help'], text=True)
     flags = ['--all'] if re.search(r'(?m)^\s*(?:-a,\s*)?--all\s', help_text) else []
     for name, repo, version, namespace in CONTROLLERS:
-        if name == 'cert-manager' and cert_managed_by_argo:
-            print('Completing existing Argo-managed cert-manager; Helm ownership is unchanged.', flush=True)
-            subprocess.check_call([sys.executable, str(ROOT / 'scripts/argocd/deploy.py'), 'cert-manager', '--context', args.context, '--timeout', str(args.timeout)])
-            continue
         helm = ['helm', '--kube-context', args.context, '--namespace', namespace]
         releases = json.loads(subprocess.check_output(helm + ['list', *flags, '--filter', f'^{name}$', '-o', 'json'], text=True))
         if releases:
@@ -188,17 +189,12 @@ def main():
                 raise RuntimeError(f'{name}: existing release is not deployed; inspect helm status. No automatic replacement.')
             print(f'Reusing {name}; version and values preserved.', flush=True)
         else:
-            marker = ('crd', 'certificates.cert-manager.io') if name == 'cert-manager' else ('ingressclass', 'traefik')
-            if read('get', *marker, '--ignore-not-found', '-o', 'name').strip():
+            if read('get', 'ingressclass', 'traefik', '--ignore-not-found', '-o', 'name').strip():
                 raise RuntimeError(f'{name}: existing resources without the expected Helm release; refusing adoption.')
             subprocess.check_call(helm + ['install', name, name, '--repo', repo, '--version', version,
                 '--create-namespace', '--values', str(ROOT / 'deploy/minikube' / name / 'values.yaml'),
                 '--wait', '--timeout', f'{args.timeout}s'])
-        deployments = ['cert-manager', 'cert-manager-webhook', 'cert-manager-cainjector'] if name == 'cert-manager' else ['traefik']
-        for deployment in deployments:
-            subprocess.check_call(kube + ['-n', namespace, 'rollout', 'status', f'deployment/{deployment}', f'--timeout={args.timeout}s'])
-    # Reuse the existing pinned, Helm-version-compatible Argo installer.
-    subprocess.check_call([sys.executable, str(ROOT / 'scripts/argocd/deploy.py'), 'install', '--context', args.context, '--timeout', str(args.timeout)])
+        subprocess.check_call(kube + ['-n', namespace, 'rollout', 'status', f'deployment/{name}', f'--timeout={args.timeout}s'])
     subprocess.check_call(kube + ['apply', '-k', str(ROOT / 'deploy/minikube/argocd')])
     print('Controllers and Argo CD ingress ready. Public HTTPS still requires host ports 80/443 and the shared certificate.')
     if args.deploy_apps:
