@@ -19,22 +19,16 @@ resources:
   limits:
     cpu: 500m
     memory: 512Mi
-# Shared with Prometheus's Traefik BasicAuth middleware; created by credentials.py.
+# Created by credentials.py. Prometheus's public route authenticates with Kong basic-auth consumers instead.
 admin:
   existingSecret: monitoring-auth
   userKey: username
   passwordKey: password
+# /grafana is a Kong route (kong-config/seed/kong.yaml); no Ingress. The Traefik Ingress values are in
+# traefik-backup-conf/deploy/minikube/observability/grafana/values.yaml.
 ingress:
-  enabled: true
-  ingressClassName: traefik
-  annotations:
-    traefik.ingress.kubernetes.io/router.tls: "true"
-  hosts: [jithendar.com]
-  path: /grafana
-  pathType: Prefix
-  tls:
-    - hosts: [jithendar.com]
-# Do not strip /grafana at the ingress: Grafana handles the prefix itself.
+  enabled: false
+# Do not strip /grafana at the gateway: Grafana handles the prefix itself.
 grafana.ini:
   server:
     domain: jithendar.com

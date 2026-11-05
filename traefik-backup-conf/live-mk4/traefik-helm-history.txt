@@ -1,0 +1,3 @@
+REVISION	UPDATED                 	STATUS  	CHART         	APP VERSION	DESCRIPTION                               
+1       	Tue Oct 27 02:17:54 2026	deployed	traefik-42.0.0	v3.7.14    	Install complete                          
+2       	Wed Nov  4 13:24:22 2026	failed  	traefik-42.0.0	v3.7.14    	Upgrade "traefik" failed: context canceled

@@ -1,0 +1,34 @@
+# Kong Gateway infrastructure (deploy/minikube/kong). Manual sync, never with prune, like every app here.
+# Argo CD manages Kubernetes objects only. It never creates, changes or deletes Kong Services, Routes, Plugins,
+# Consumers or Certificates: those live in Kong's database (docs/kong/02-architecture.md).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kong
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: roboshop-gitops
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  project: mk-gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kong
+  syncPolicy:
+    syncOptions:
+    - FailOnSharedResource=true
+    - PruneLast=true
+    - CreateNamespace=false
+  # The API server adds controller-uid labels to a Job's selector and pod template; without this the
+  # completed bootstrap Job would show OutOfSync forever (and a Replace sync would re-run it).
+  ignoreDifferences:
+  - group: batch
+    kind: Job
+    jsonPointers:
+    - /spec/selector
+    - /spec/template/metadata/labels
+  source:
+    repoURL: https://github.com/mrjithendar/tools.git
+    targetRevision: master
+    path: deploy/minikube/kong

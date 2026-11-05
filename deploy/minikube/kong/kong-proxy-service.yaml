@@ -1,0 +1,21 @@
+# The proxy Service is the only one that receives public traffic: HAProxy on the host forwards to its
+# NodePorts (deploy/minikube/expose-ingress.sh, INGRESS_TARGET=kong). The NodePorts differ from Traefik's
+# 30080/30443 so both can run during the cutover window and rollback is a HAProxy switch.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-proxy
+  namespace: kong
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: kong-gateway
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: kong
+  ports:
+  - {name: http, port: 80, targetPort: proxy, nodePort: 31080}
+  - {name: https, port: 443, targetPort: proxy-tls, nodePort: 31443}
+  - {name: postgres-tls, port: 9443, targetPort: stream-tls, nodePort: 31543}

@@ -1,0 +1,73 @@
+# cert-sync: the ONLY automation allowed to write Kong entities (docs/kong/02-architecture.md).
+#
+# It owns exactly two Kong Certificates, by fixed id, with their SNIs, and nothing else:
+#   2bc41d85-5025-5dbe-be05-5bf66f627345  jithendar.com, www.jithendar.com  <- Secret kong/jithendar-com-tls
+#   81abe1c9-9735-56df-8043-13c8c57f9be1  db.jithendar.com                  <- Secret kong/db-jithendar-com-tls
+# cert-manager renews the Secrets (certificates.yaml, DNS-01); the kubelet refreshes the mounted files; this
+# loop notices the change and PUTs the new pair. It runs as a sidecar in the Kong pod and talks to the Admin API
+# on 127.0.0.1, so the Admin API never needs a network listener. Do not edit these two Certificates in
+# Kong Manager: the next loop overwrites them.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-cert-sync
+  namespace: kong
+  labels:
+    app.kubernetes.io/name: kong-cert-sync
+    app.kubernetes.io/part-of: kong-gateway
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+data:
+  cert_sync.py: |
+    """Upload cert-manager certificates to Kong's Admin API when they change. Standard library only."""
+    import json, os, sys, time, urllib.error, urllib.request
+
+    ADMIN = os.environ.get("KONG_ADMIN_URL", "http://127.0.0.1:8001")
+    INTERVAL = int(os.environ.get("SYNC_INTERVAL_SECONDS", "300"))
+    OWNED = [
+        ("2bc41d85-5025-5dbe-be05-5bf66f627345", "/certs/jithendar-com", ["jithendar.com", "www.jithendar.com"]),
+        ("81abe1c9-9735-56df-8043-13c8c57f9be1", "/certs/db-jithendar-com", ["db.jithendar.com"]),
+    ]
+    TAGS = ["managed-by:cert-sync"]
+
+    def call(method, path, body=None):
+        data = json.dumps(body).encode() if body is not None else None
+        req = urllib.request.Request(ADMIN + path, data=data, method=method, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                return r.status, json.loads(r.read() or b"{}")
+        except urllib.error.HTTPError as e:
+            return e.code, {}
+        except (urllib.error.URLError, OSError):  # Kong not listening yet
+            return 0, {}
+
+    def sync_one(cert_id, directory, snis):
+        try:
+            cert = open(os.path.join(directory, "tls.crt")).read().strip()
+            key = open(os.path.join(directory, "tls.key")).read().strip()
+        except OSError as e:
+            print(f"{cert_id}: secret not mounted yet ({e.strerror})", flush=True)
+            return
+        if not cert or not key:
+            print(f"{cert_id}: secret is empty, cert-manager has not issued it yet", flush=True)
+            return
+        status, current = call("GET", f"/certificates/{cert_id}")
+        if status == 200 and current.get("cert", "").strip() == cert and sorted(current.get("snis") or []) == sorted(snis):
+            return
+        status, _ = call("PUT", f"/certificates/{cert_id}", {"cert": cert, "key": key, "snis": snis, "tags": TAGS})
+        print(f"{cert_id}: uploaded for {','.join(snis)} -> HTTP {status}", flush=True)  # never prints key material
+
+    def main():
+        while True:
+            status, _ = call("GET", "/status")
+            if status == 200:
+                for owned in OWNED:
+                    sync_one(*owned)
+            else:
+                print(f"Admin API not ready (HTTP {status})", flush=True)
+            if "--once" in sys.argv:
+                return
+            time.sleep(INTERVAL)
+
+    if __name__ == "__main__":
+        main()

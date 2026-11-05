@@ -1,0 +1,31 @@
+# Migration Jobs: DNS and PostgreSQL only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kong-jobs
+  namespace: kong
+  labels:
+    app.kubernetes.io/part-of: kong-gateway
+spec:
+  podSelector:
+    matchExpressions:
+    - {key: app.kubernetes.io/name, operator: In, values: [kong-migrations]}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - {port: 53, protocol: UDP}
+    - {port: 53, protocol: TCP}
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kong-postgres
+    ports:
+    - {port: 5432, protocol: TCP}

@@ -1,0 +1,72 @@
+# kong migrations finish: TEMPLATE, applied by hand during an upgrade. Not in kustomization.yaml, so Argo CD never
+# creates or re-runs it. Step 2, only after every node runs the new version: removes what old nodes still needed.
+# Replace NEW_VERSION (for example 3.9.5) everywhere, and the image pin, before applying:
+#   sed 's/NEW_VERSION/3.9.5/g' upgrade/migrations-finish-job.yaml | kubectl --context mk4 apply -f -
+# Kong's migration mutex stops two runs from overlapping; `up` exits instead of waiting when another node holds it.
+# Full procedure: docs/kong/05-backup-restore.md (Upgrades). Never add --force.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kong-migrations-finish-NEW_VERSION
+  namespace: kong
+  labels:
+    app.kubernetes.io/name: kong-migrations
+    app.kubernetes.io/part-of: kong-gateway
+    app.kubernetes.io/version: "NEW_VERSION"
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kong-migrations
+        app.kubernetes.io/part-of: kong-gateway
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      - name: wait-for-postgres
+        image: postgres:17.11-alpine
+        imagePullPolicy: IfNotPresent
+        command: [sh, -c, "until pg_isready -h kong-postgres.kong.svc.cluster.local -p 5432 -U kong -d kong; do sleep 3; done"]
+        securityContext:
+          runAsUser: 70
+          runAsGroup: 70
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+        resources:
+          requests: {cpu: 10m, memory: 16Mi}
+          limits: {cpu: 100m, memory: 64Mi}
+      containers:
+      - name: migrations-finish
+        image: kong:NEW_VERSION
+        imagePullPolicy: IfNotPresent
+        command: [kong, migrations, finish, --lock-timeout, "120", --vv]
+        envFrom:
+        - configMapRef: {name: kong-config}
+        env:
+        - name: KONG_PG_PASSWORD
+          valueFrom:
+            secretKeyRef: {name: kong-postgres, key: kong-password}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+        resources:
+          requests: {cpu: 100m, memory: 256Mi}
+          limits: {cpu: 500m, memory: 512Mi}
+        volumeMounts:
+        - {name: prefix, mountPath: /kong_prefix}
+        - {name: tmp, mountPath: /tmp}
+      volumes:
+      - {name: prefix, emptyDir: {}}
+      - {name: tmp, emptyDir: {}}

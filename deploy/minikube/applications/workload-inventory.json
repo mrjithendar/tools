@@ -1,6 +1,11 @@
 [
   [
     "Deployment",
+    "kong",
+    "kong"
+  ],
+  [
+    "Deployment",
     "kube-system",
     "metrics-server"
   ],
@@ -33,5 +38,10 @@
     "Deployment",
     "observability",
     "otel-collector"
+  ],
+  [
+    "StatefulSet",
+    "kong",
+    "kong-postgres"
   ]
 ]

@@ -1,0 +1,19 @@
+# Admin API and Kong Manager. ClusterIP only, and Kong listens on 127.0.0.1 for both, so these Services
+# exist only so that `kubectl port-forward svc/kong-admin` works; nothing in the cluster network can connect.
+# No Ingress, NodePort, LoadBalancer, tunnel or Kong route may ever point at them.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-admin
+  namespace: kong
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: kong-gateway
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: kong
+  ports:
+  - {name: admin, port: 8001, targetPort: admin}

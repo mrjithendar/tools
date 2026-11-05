@@ -1,0 +1,94 @@
+# Kong 3.9.4 node configuration (kong.conf values as KONG_* environment variables). Every value below was
+# checked against kong.conf.default and the nginx templates at tag 3.9.4 (docs/kong/01-compatibility.md).
+# The database password is not here: it comes from Secret kong-postgres.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  namespace: kong
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: kong-gateway
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+data:
+  KONG_DATABASE: postgres
+  KONG_PG_HOST: kong-postgres.kong.svc.cluster.local
+  KONG_PG_PORT: "5432"
+  KONG_PG_USER: kong
+  KONG_PG_DATABASE: kong
+  # In-cluster hop, restricted by NetworkPolicy to Kong's own pods. See docs/kong/02-architecture.md.
+  KONG_PG_SSL: "off"
+  KONG_PREFIX: /kong_prefix
+
+  # Public listeners. HAProxy on the host prepends the PROXY protocol (v2) header, exactly as it does for
+  # Traefik today, so these two ports REQUIRE it: nginx rejects a connection without the header.
+  # 8180 and 8543 accept plain connections for testing through kubectl port-forward before cutover (Service
+  # kong-proxy-test, ClusterIP only). They see the port-forward's address as the client.
+  KONG_PROXY_LISTEN: >-
+    0.0.0.0:8000 proxy_protocol reuseport backlog=16384,
+    0.0.0.0:8443 http2 ssl proxy_protocol reuseport backlog=16384,
+    0.0.0.0:8180 reuseport backlog=16384,
+    0.0.0.0:8543 http2 ssl reuseport backlog=16384
+  # PostgreSQL over TLS for db.jithendar.com (stream route on SNI). HAProxy sends only that SNI here.
+  KONG_STREAM_LISTEN: 0.0.0.0:9443 ssl proxy_protocol reuseport backlog=16384
+  # libpq's direct TLS handshake (sslnegotiation=direct) requires the server to select ALPN "postgresql",
+  # which Traefik did through TLSOption db-postgres. Injected into Kong's TLS-terminating stream server block.
+  KONG_NGINX_SPROXY_SSL_ALPN: postgresql
+
+  # Real client addresses: only the minikube Docker network may send the PROXY header (same range Traefik
+  # trusts). A global pre-function in the seed drops client-sent X-Forwarded-* headers, because Kong trusts
+  # those headers from any trusted_ips address and HAProxy cannot strip them in TCP mode.
+  KONG_TRUSTED_IPS: 192.168.49.0/24
+  KONG_REAL_IP_HEADER: proxy_protocol
+  KONG_REAL_IP_RECURSIVE: "off"
+
+  # Admin API and Kong Manager listen on the pod's loopback only. kubectl port-forward reaches loopback;
+  # no other pod, Service or node can. Kong OSS has no login on either.
+  KONG_ADMIN_LISTEN: 127.0.0.1:8001 reuseport backlog=16384
+  KONG_ADMIN_GUI_LISTEN: 127.0.0.1:8002
+  # Must equal the URLs the browser uses through port-forward (docs/kong/03-admin-access.md). admin_gui_url
+  # also becomes the only origin the Admin API returns in Access-Control-Allow-Origin.
+  KONG_ADMIN_GUI_URL: http://localhost:8002
+  KONG_ADMIN_GUI_API_URL: http://localhost:8001
+  KONG_ADMIN_GUI_PATH: /
+  # Status API for probes and Prometheus (/status, /status/ready, /metrics with the prometheus plugin).
+  KONG_STATUS_LISTEN: 0.0.0.0:8007
+
+  # CPU limit is 1 core: one worker. Shared memory sized for the 1Gi limit.
+  KONG_NGINX_WORKER_PROCESSES: "1"
+  KONG_MEM_CACHE_SIZE: 64m
+  # Largest known application body: jithendar.com server actions, 11 MB (www/next.config.ts). Traefik had no
+  # limit; 16m keeps headroom for Loki pushes. Larger bodies get 413.
+  KONG_NGINX_HTTP_CLIENT_MAX_BODY_SIZE: 16m
+  KONG_NGINX_HTTP_CLIENT_BODY_BUFFER_SIZE: 1m
+
+  # Traefik added no gateway headers; keep responses and upstream requests free of Server/Via/X-Kong-*.
+  KONG_HEADERS: "off"
+  KONG_HEADERS_UPSTREAM: "off"
+
+  # Replaces Traefik's "compress" middleware (Kong OSS has no compression plugin). gzip only: nginx OSS has
+  # no br/zstd. text/event-stream is not listed, so MOKS's SSE is never compressed or buffered by gzip.
+  KONG_NGINX_PROXY_GZIP: "on"
+  KONG_NGINX_PROXY_GZIP_TYPES: >-
+    text/plain text/css text/xml text/javascript application/javascript application/json application/xml
+    application/rss+xml application/manifest+json image/svg+xml
+  KONG_NGINX_PROXY_GZIP_MIN_LENGTH: "1024"
+  KONG_NGINX_PROXY_GZIP_PROXIED: any
+  KONG_NGINX_PROXY_GZIP_VARY: "on"
+
+  KONG_PLUGINS: bundled
+  KONG_UNTRUSTED_LUA: sandbox
+  KONG_ANONYMOUS_REPORTS: "off"
+  KONG_LUA_SSL_TRUSTED_CERTIFICATE: system
+  KONG_LOG_LEVEL: notice
+  KONG_PROXY_ACCESS_LOG: /dev/stdout
+  KONG_PROXY_ERROR_LOG: /dev/stderr
+  KONG_PROXY_STREAM_ACCESS_LOG: /dev/stdout basic
+  KONG_PROXY_STREAM_ERROR_LOG: /dev/stderr
+  KONG_ADMIN_ACCESS_LOG: /dev/stdout
+  KONG_ADMIN_ERROR_LOG: /dev/stderr
+  KONG_ADMIN_GUI_ACCESS_LOG: /dev/stdout
+  KONG_ADMIN_GUI_ERROR_LOG: /dev/stderr
+  KONG_STATUS_ACCESS_LOG: "off"
+  KONG_STATUS_ERROR_LOG: /dev/stderr

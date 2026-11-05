@@ -1,0 +1,24 @@
+# The init script runs only when the data directory is empty (first start). Later password changes are made
+# with ALTER ROLE (docs/kong/05-backup-restore.md), not by editing this script.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-postgres-init
+  namespace: kong
+  labels:
+    app.kubernetes.io/name: kong-postgres
+    app.kubernetes.io/part-of: kong-gateway
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  10-kong-database.sh: |
+    #!/bin/sh
+    # Creates the role and database Kong uses. The superuser stays for maintenance only.
+    set -eu
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \
+      --set kong_password="$KONG_DB_PASSWORD" <<'SQL'
+    CREATE ROLE kong LOGIN PASSWORD :'kong_password';
+    CREATE DATABASE kong OWNER kong ENCODING 'UTF8';
+    REVOKE ALL ON DATABASE kong FROM PUBLIC;
+    GRANT CONNECT, TEMPORARY ON DATABASE kong TO kong;
+    SQL

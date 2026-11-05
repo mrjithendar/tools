@@ -1,0 +1,24 @@
+# PostgreSQL: only Kong and the bootstrap/upgrade Jobs may connect. Backups use kubectl exec (no network).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kong-postgres
+  namespace: kong
+  labels:
+    app.kubernetes.io/part-of: kong-gateway
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kong-postgres
+  policyTypes: [Ingress, Egress]
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kong
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: kong-migrations
+    ports:
+    - {port: 5432, protocol: TCP}
+  egress: []

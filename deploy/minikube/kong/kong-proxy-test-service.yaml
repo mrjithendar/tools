@@ -1,0 +1,19 @@
+# Plain listeners without the PROXY protocol, for testing through kubectl port-forward before and after the
+# switch. ClusterIP; NetworkPolicy admits no other pod to these ports.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-proxy-test
+  namespace: kong
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/part-of: kong-gateway
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: kong
+  ports:
+  - {name: http, port: 8180, targetPort: proxy-test}
+  - {name: https, port: 8543, targetPort: proxy-test-tls}
