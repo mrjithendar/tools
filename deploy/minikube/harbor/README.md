@@ -86,12 +86,14 @@ Each is a setting this repository did not have before.
 2. **Traefik timeout.** Apply `../traefik/values.yaml` with `./deploy-traefik.sh --context mk4`, or `helm upgrade`
    it some other way. The live release `traefik/traefik` is at revision 2 with status `failed`
    (`helm --kube-context mk4 -n traefik history traefik`); find out why before upgrading over it.
-3. **Docker Hub.** `docker login` on the build machine as an account that can push to `jithendar/custom-harbour`,
-   and a Docker Hub access token (read-only is enough) for mk4 to pull with. `deploy-harbor.sh` asks for it once
-   and stores it as `harbor/dockerhub-pull`.
-4. **Build machine.** A native arm64 Docker host with the Compose plugin that is **not** the mk4 server, such as
-   this Mac with Docker Desktop, OrbStack or colima installed (none is installed today), plus kubectl access to mk4
-   and `htpasswd` (macOS ships it).
+3. **Docker Hub.** Two access tokens: one with write access to `jithendar/custom-harbour` for the build, and a
+   read-only one for mk4 to pull with. `deploy-harbor.sh` asks for the read-only one once and stores it as
+   `harbor/dockerhub-pull`.
+4. **Build machine.** A native arm64 Docker host with the Compose plugin that is **not** the mk4 server (the script
+   refuses to build there). The workflow [`build-harbor-images.yml`](../../../.github/workflows/build-harbor-images.yml)
+   runs the build on GitHub's hosted arm64 runner: add the repository secrets `DOCKERHUB_USERNAME` and
+   `DOCKERHUB_TOKEN` (the write token). An Apple Silicon Mac with Docker Desktop, OrbStack or colima also works.
+   The deploy step runs on any machine with kubectl access to mk4 and `htpasswd`, including the mk4 host.
 5. **Node.** `mk4-m05`, set in `values.yaml` and `manifests/`. Change every `kubernetes.io/hostname` together,
    and only before the first sync: the volumes stay where the pods first ran.
 
@@ -100,11 +102,17 @@ Each is a setting this repository did not have before.
 After the prerequisites, merge this branch and push it: Argo CD reads `master`, and the script stops if your
 Harbor files differ from `origin/master`. Then, from the repository root:
 
+1. Build and push: GitHub, *Actions → Build Harbor images → Run workflow* (about half an hour the first time).
+   On your own arm64 machine instead: `docker login`, then `bash deploy/minikube/harbor/deploy-harbor.sh --skip-deploy`.
+2. Deploy, on the mk4 host or anywhere with kubectl access to mk4:
+
 ```bash
-docker login                                   # push access to jithendar/custom-harbour
+docker login                                   # lets the script check the images exist (it skips the check without docker)
 python3 scripts/argocd/validate.py --external-charts
-bash deploy/minikube/harbor/deploy-harbor.sh   # build (long the first time), push, then deploy
+bash deploy/minikube/harbor/deploy-harbor.sh --skip-build
 ```
+
+On an arm64 machine that is not the mk4 server, `bash deploy/minikube/harbor/deploy-harbor.sh` does both.
 
 The script:
 
