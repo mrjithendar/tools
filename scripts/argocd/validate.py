@@ -9,7 +9,7 @@ import tempfile
 import sys
 import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lib'))
-from repos import CATALOGS, ROOT, checkout  # noqa: E402
+from repos import CATALOGS, OPTIONAL_ARGOCD, ROOT, checkout  # noqa: E402
 
 
 def command(args):
@@ -21,8 +21,9 @@ def objects(text):
 
 
 def catalog():
-    """Every catalog rendered together, so ownership and project checks span both repositories."""
-    return [doc for directory in CATALOGS for doc in objects(command(['kubectl', 'kustomize', str(directory)]))]
+    """Every catalog rendered together, so ownership and project checks span both repositories.
+    Opt-in Applications (applications/optional) are checked too; only their workloads are not required."""
+    return [doc for directory in (*CATALOGS, OPTIONAL_ARGOCD) for doc in objects(command(['kubectl', 'kustomize', str(directory)]))]
 
 
 def render(app, external=False):
@@ -93,7 +94,11 @@ def validate(external=False):
             cluster_kind=kind in ('Namespace','ClusterRole','ClusterRoleBinding','CustomResourceDefinition','APIService','ClusterIssuer','MutatingWebhookConfiguration','ValidatingWebhookConfiguration')
             if not namespace and not cluster_kind:namespace=spec['destination']['namespace']
             assert namespace not in ('argocd','traefik') or (name=='loki' and namespace=='traefik' and kind in ('Role','RoleBinding')),(name,kind,meta['name'])
-            if kind=='Secret':
+            if kind=='Secret' and name=='harbor':
+                # The chart always renders these; with every credential in harbor-credentials they hold no values.
+                assert meta['name'] in ('harbor-core','harbor-jobservice','harbor-registry','harbor-registryctl'),meta['name']
+                assert not resource.get('stringData') and not any((resource.get('data') or {}).values()),f'harbor: Secret/{meta["name"]} carries a value: move it to harbor-credentials'
+            elif kind=='Secret':
                 assert name=='jfrog' and meta['name']=='jfrog-artifactory-unified-secret',f'{name} renders a credential Secret: provision credentials externally'
                 assert set(resource.get('stringData',{}))=={'access.config.patch.yml','binarystore.xml','system.yaml'}
                 assert not resource.get('data')

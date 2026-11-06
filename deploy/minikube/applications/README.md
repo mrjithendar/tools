@@ -26,3 +26,16 @@ python3 scripts/argocd/validate.py --external-charts                     # also 
 ```
 
 None of these Applications sync automatically; never sync them with prune.
+
+## Opt-in: `optional/`
+
+`optional/` holds Applications that `deploy.py` offers only by name, never for `all`, and whose workloads are not in
+`workload-inventory.json`. `validate.py` checks them with the catalog above.
+
+| Application | Project | Source | Namespace |
+|---|---|---|---|
+| `harbor` | `mk-registry` (`optional/project-registry.yaml`) | harbor chart 1.19.4 + `deploy/minikube/harbor/values.yaml` + `deploy/minikube/harbor/manifests` | `harbor` |
+
+```bash
+python3 scripts/argocd/deploy.py harbor --context mk4   # prerequisites first: deploy/minikube/harbor/README.md
+```
