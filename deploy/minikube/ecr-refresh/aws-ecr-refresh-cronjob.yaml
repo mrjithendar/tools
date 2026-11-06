@@ -25,7 +25,7 @@ spec:
               type: RuntimeDefault
           initContainers:
           - name: ecr-token
-            image: public.ecr.aws/aws-cli/aws-cli:2.38.5
+            image: public.ecr.aws/aws-cli/aws-cli:2.39.3
             command:
             - /bin/sh
             - -ec
@@ -81,7 +81,7 @@ spec:
               mountPath: /tmp
           containers:
           - name: refresh
-            image: python:3.13.9-slim
+            image: python:3.15.0-slim
             command:
             - python
             - -B
