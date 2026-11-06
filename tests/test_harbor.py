@@ -163,7 +163,16 @@ def test_script_pins_source_refuses_the_cluster_host_and_deploys_from_master():
     assert 'DOCKERHUB_TOKEN="$token" python3 -c' in SCRIPT and '--docker-password' not in SCRIPT
     subprocess.run(['bash', '-n', str(HARBOR / 'deploy-harbor.sh')], check=True)
     assert not (HARBOR / 'build-images.sh').exists()
-    assert not (ROOT / '.github/workflows/build-harbor-images.yml').exists()
+
+
+def test_build_workflow_is_manual_arm64_and_only_builds():
+    text = (ROOT / '.github/workflows/build-harbor-images.yml').read_text()
+    workflow = yaml.safe_load(text)
+    assert list(workflow[True]) == ['workflow_dispatch']   # PyYAML reads the key "on" as True
+    job = workflow['jobs']['build']
+    assert job['runs-on'] == 'ubuntu-24.04-arm' and workflow['permissions'] == {'contents': 'read'}
+    assert 'args=(--skip-deploy)' in text and 'deploy-harbor.sh "${args[@]}"' in text
+    assert '--password-stdin' in text and '--password "' not in text
 
 
 def test_script_rejects_unknown_arguments_without_side_effects():

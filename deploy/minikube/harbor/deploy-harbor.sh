@@ -3,7 +3,8 @@
 # its Argo CD Application. README.md lists what must exist first (DNS, Traefik timeout).
 #
 #   1. build  Harbor's own Makefile on the pinned tag, on a native arm64 Docker host that is not the mk4 server
-#             (image builds there froze the cluster twice: runner/README.md). An Apple Silicon Mac works.
+#             (image builds there froze the cluster twice: runner/README.md). An Apple Silicon Mac works, and
+#             .github/workflows/build-harbor-images.yml runs this step on GitHub's arm64 runner.
 #   2. push   docker push jithendar/custom-harbour:<component>-v2.15.4 (run "docker login" first)
 #   3. deploy create-secrets.sh (harbor-credentials), Secret dockerhub-pull, then scripts/argocd/deploy.py harbor
 #
@@ -29,7 +30,7 @@ for arg in "$@"; do
     --skip-deploy) DEPLOY=false ;;
     --with-trivy) WITH_TRIVY=true ;;
     --skip-git-check) GIT_CHECK=false ;;
-    -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) fail "unknown argument: $arg (see --help)" ;;
   esac
 done
