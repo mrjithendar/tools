@@ -9,7 +9,7 @@ Argo CD Application, opt-in: `deploy.py all` never selects it.
 | Portal | https://registry.jithendar.com/harbor/ (https://jithendar.com/harbor redirects there) |
 | Registry | `registry.jithendar.com/<project>/<image>:<tag>` |
 | Argo CD | Application `harbor`, AppProject `mk-registry`, namespace `harbor` ([`../applications/optional/`](../applications/optional/)) |
-| Files | [`values.yaml`](values.yaml) (chart), [`manifests/`](manifests/) (database, Redis, TLS, routes, backup), [`credentials.py`](credentials.py), [`build-images.sh`](build-images.sh), [`examples/`](examples/) |
+| Files | [`values.yaml`](values.yaml) (chart), [`manifests/`](manifests/) (database, Redis, TLS, routes, backup), [`credentials.py`](credentials.py), [`deploy-harbor.sh`](deploy-harbor.sh) (build, push, deploy), [`examples/`](examples/) |
 
 Status on 2026-11-06: nothing is deployed. DNS, images and secrets below are prerequisites.
 
@@ -32,7 +32,7 @@ and `expose.ingress.hosts.core` in `values.yaml` and the hostnames in `manifests
 
 | Decision | Why |
 |---|---|
-| Harbor images built from source for arm64 and kept in ECR | goharbor publishes amd64 only (v2.15.4 on Docker Hub and GHCR); every mk4 node is arm64. ECR is reachable when Harbor is not, so Harbor never needs itself to start. |
+| Harbor images built from source for arm64 and kept in the private Docker Hub repository `jithendar/custom-harbour` | goharbor publishes amd64 only (v2.15.4 on Docker Hub and GHCR); every mk4 node is arm64. One tag per component, `<component>-v2.15.4`. Docker Hub is reachable when Harbor is not, so Harbor never needs itself to start. |
 | PostgreSQL 18 and Valkey 8 as StatefulSets beside the chart, not the chart's internal ones | Argo CD renders without cluster access. The chart's internal database takes its password only from values (default `changeit`), and its internal Redis has no password, yet Harbor keeps portal sessions in Redis. mk4 runs arbitrary code (MOKS terminals, the practice executor) and kindnet's NetworkPolicy enforcement is unproven, so both need real credentials. |
 | Every credential in `harbor/harbor-credentials`, created by `./create-secrets.sh` | Anything the chart generates (`randAlphaNum`, `genCA`) would change on every Argo CD sync. The Redis password is spliced into each component's Redis URL at runtime (`$(REDIS_PASSWORD)`), because the chart's `existingSecret` for Redis needs Helm `lookup`. |
 | Token-signing key from cert-manager (self-signed, 10 years, never rotated) | Same reason; cert-manager already owns TLS keys here. |
@@ -86,29 +86,44 @@ Each is a setting this repository did not have before.
 2. **Traefik timeout.** Apply `../traefik/values.yaml` with `./deploy-traefik.sh --context mk4`, or `helm upgrade`
    it some other way. The live release `traefik/traefik` is at revision 2 with status `failed`
    (`helm --kube-context mk4 -n traefik history traefik`); find out why before upgrading over it.
-3. **Images.** Run the workflow **Build Harbor images (arm64)** (`.github/workflows/build-harbor-images.yml`)
-   after adding repository secrets `HARBOR_BUILD_AWS_ACCESS_KEY_ID` / `HARBOR_BUILD_AWS_SECRET_ACCESS_KEY`
-   for an IAM user with `ecr:GetAuthorizationToken`, push rights on `harbor/*` and `ecr:CreateRepository`. Or
-   run `bash deploy/minikube/harbor/build-images.sh` on any arm64 Docker host that is not mk4. It creates
-   `harbor/harbor-portal`, `harbor-core`, `harbor-jobservice`, `registry-photon` and `harbor-registryctl` in ECR
-   `881026659929.dkr.ecr.us-east-1.amazonaws.com`, tag `v2.15.4`, the names `values.yaml` uses. These
-   repositories are not in `infrastructure/` Terraform, which auto-applies on master.
-4. **Credentials.** `./create-secrets.sh --context mk4 --services harbor --ecr --apply` creates the namespace,
-   `harbor-credentials` (needs `htpasswd`, which macOS ships) and the `ecr-pull` Secret. Then save a copy of
-   `harbor-credentials` off-host (Backup).
+3. **Docker Hub.** `docker login` on the build machine as an account that can push to `jithendar/custom-harbour`,
+   and a Docker Hub access token (read-only is enough) for mk4 to pull with. `deploy-harbor.sh` asks for it once
+   and stores it as `harbor/dockerhub-pull`.
+4. **Build machine.** A native arm64 Docker host with the Compose plugin that is **not** the mk4 server, such as
+   this Mac with Docker Desktop, OrbStack or colima installed (none is installed today), plus kubectl access to mk4
+   and `htpasswd` (macOS ships it).
 5. **Node.** `mk4-m05`, set in `values.yaml` and `manifests/`. Change every `kubernetes.io/hostname` together,
    and only before the first sync: the volumes stay where the pods first ran.
 
 ## Deploy
 
-After the prerequisites, and after this branch is merged and pushed (Argo CD reads `master`):
+After the prerequisites, merge this branch and push it: Argo CD reads `master`, and the script stops if your
+Harbor files differ from `origin/master`. Then, from the repository root:
 
 ```bash
+docker login                                   # push access to jithendar/custom-harbour
 python3 scripts/argocd/validate.py --external-charts
-python3 scripts/argocd/deploy.py harbor --dry-run
-python3 scripts/argocd/deploy.py harbor --context mk4      # creates mk-registry and harbor, syncs without prune
-kubectl --context mk4 -n harbor get pods,pvc,certificate,ingress
+bash deploy/minikube/harbor/deploy-harbor.sh   # build (long the first time), push, then deploy
 ```
+
+The script:
+
+1. Builds Harbor v2.15.4 for arm64 from its pinned commit with Harbor's own Makefile.
+2. Pushes `jithendar/custom-harbour:harbor-portal-v2.15.4`, `harbor-core-…`, `harbor-jobservice-…`,
+   `registry-photon-…` and `harbor-registryctl-…`.
+3. Runs `./create-secrets.sh --services harbor --apply` (namespace and `harbor-credentials`, never rotated), creates
+   `dockerhub-pull` if it is missing, and runs `scripts/argocd/deploy.py harbor` (creates `mk-registry` and
+   `harbor`, syncs without prune, waits for Healthy).
+
+Afterwards, save a copy of `harbor-credentials` off-host (Backup and restore).
+
+| To | Run |
+|---|---|
+| Build and push only, deploy later | `deploy-harbor.sh --skip-deploy` |
+| Deploy images already pushed (also on re-syncs) | `deploy-harbor.sh --skip-build` |
+| Include the Trivy adapter | `deploy-harbor.sh --with-trivy` |
+| Another repository or cluster | `IMAGE_REPO=… KUBE_CONTEXT=…` (and change `values.yaml` to match) |
+| Replace the pull token | `kubectl --context mk4 -n harbor delete secret dockerhub-pull`, then `--skip-build` |
 
 `deploy.py` does not update an AppProject that already exists. After changing `project-registry.yaml`, run
 `kubectl --context mk4 apply -f deploy/minikube/applications/optional/project-registry.yaml`.
@@ -276,9 +291,8 @@ harbor POST /system/gc/schedule -d '{"schedule":{"type":"Custom","cron":"0 0 4 *
 
 ## Trivy
 
-Off by default (`trivy.enabled: false`). To enable: run the image workflow with **Also build the Trivy adapter**
-(or `build-images.sh --with-trivy`; it downloads Trivy v0.75.0's `Linux-ARM64` build), then set
-`trivy.enabled: true` in `values.yaml`. It adds 200m / 512Mi requested, 1 CPU / 1Gi limit and a 5Gi volume, and
+Off by default (`trivy.enabled: false`). To enable: set `trivy.enabled: true` in `values.yaml`, merge, and run
+`deploy-harbor.sh --with-trivy` (it downloads Trivy v0.75.0's `Linux-ARM64` build). It adds 200m / 512Mi requested, 1 CPU / 1Gi limit and a 5Gi volume, and
 downloads its vulnerability database from the internet. Scans then run on push if a project enables
 "Automatically scan images on push". CI scanning stays as it is: MOKS's `trivy-action` step scans the terminal
 image before it is pushed and does not depend on the registry.
@@ -331,15 +345,16 @@ kubectl --context mk4 -n harbor get secret harbor-credentials -o json |
 
 ### Restore, including after Minikube is rebuilt
 
-Harbor's own images come from ECR and the database and Redis images from Docker Hub, so none of this needs Harbor.
+Harbor's own images come from `jithendar/custom-harbour` and the database and Redis images from public Docker Hub,
+so none of this needs Harbor.
 
 1. Rebuild the cluster as usual: `./deploy-minikube.sh`, `./bootstrap-cluster.sh --context mk4` (cert-manager,
    Traefik, Argo CD, ECR pull secrets), and re-apply the Traefik timeout (Prerequisites).
 2. `kubectl --context mk4 apply -f deploy/minikube/namespaces/harbor.yaml`, then apply the saved
    `harbor-credentials.json` and recreate `harbor-backup-r2`. Restore `harbor-credentials` **before** anything
    else: `create-secrets.sh` would otherwise generate a new one, which cannot decrypt the restored data.
-3. `./create-secrets.sh --context mk4 --services harbor --ecr --apply`. It reuses the restored Secret and adds `ecr-pull`.
-4. `python3 scripts/argocd/deploy.py harbor --context mk4`. Harbor starts empty; core creates a fresh schema.
+3. `bash deploy/minikube/harbor/deploy-harbor.sh --skip-build`. It reuses the restored Secret, recreates
+   `dockerhub-pull`, and syncs. Harbor starts empty; core creates a fresh schema.
 5. Stop everything that writes, then restore the dump named in `LATEST` and the blobs:
    ```bash
    kubectl --context mk4 -n harbor scale deploy harbor-core harbor-jobservice harbor-registry --replicas=0
@@ -362,7 +377,7 @@ pushing critical images to ECR too.
    `terminal` image; that repository's workflow has to change.
 3. Switch its workload to `registry.jithendar.com/moks/…` with `harbor-pull`, watch pulls, retention dry runs,
    one GC and one restore drill into a scratch namespace.
-4. Move the rest project by project, then delete their ECR repositories. Harbor's own `harbor/*` repositories stay in ECR.
+4. Move the rest project by project, then delete their ECR repositories.
 
 ## Roll back
 
@@ -375,7 +390,7 @@ after a final backup. Reverting the Traefik timeout is a values change and a Tra
 
 - No Harbor runs anywhere yet: render, `validate.py` and a server-side dry run on mk4 (every object accepted,
   nothing created) are the only checks.
-- `build-images.sh` has not run. Its build path follows Harbor's Makefile and release workflow, and nothing in the
+- `deploy-harbor.sh` has not run. Its build path follows Harbor's Makefile and release workflow, and nothing in the
   components it builds pins amd64, but no arm64 build of v2.15.4 has been seen to succeed.
 - Push and pull through Traefik with the 900s timeout, node-runtime pulls, retention, GC, backup and restore all
   depend on a running Harbor.

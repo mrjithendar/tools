@@ -14,7 +14,7 @@ HARBOR = ROOT / 'deploy/minikube/harbor'
 OPTIONAL = ROOT / 'deploy/minikube/applications/optional'
 VALUES = yaml.safe_load((HARBOR / 'values.yaml').read_text())
 APP = yaml.safe_load((OPTIONAL / 'harbor.yaml').read_text())
-BUILD = (HARBOR / 'build-images.sh').read_text()
+SCRIPT = (HARBOR / 'deploy-harbor.sh').read_text()
 
 
 def load(name, path):
@@ -135,28 +135,40 @@ def test_everything_runs_on_one_node():
     assert nodes == {'mk4-m05'}
 
 
-def test_chart_images_come_from_ecr_at_the_built_version():
-    version = re.search(r'^HARBOR_VERSION=(\S+)', BUILD, re.M).group(1)
-    built = set(re.search(r'^IMAGES="([^"]+)"', BUILD, re.M).group(1).split()) | {'trivy-adapter-photon'}
+def test_chart_images_are_the_tags_the_script_pushes():
+    version = re.search(r'^HARBOR_VERSION=(\S+)', SCRIPT, re.M).group(1)
+    repo = re.search(r'^IMAGE_REPO="\$\{IMAGE_REPO:-([^}]+)\}"', SCRIPT, re.M).group(1)
+    pushed = set(re.search(r'^IMAGES="([^"]+)"', SCRIPT, re.M).group(1).split()) | {'trivy-adapter-photon'}
     images = [VALUES[c]['image'] for c in ('portal', 'core', 'jobservice', 'trivy')]
     images += [VALUES['registry'][c]['image'] for c in ('registry', 'controller')]
     for image in images:
-        registry, _, name = image['repository'].rpartition('/')
-        assert registry == '881026659929.dkr.ecr.us-east-1.amazonaws.com/harbor', image
-        assert name in built and image['tag'] == version, image
-    assert VALUES['imagePullSecrets'] == [{'name': 'ecr-pull'}]
+        assert image['repository'] == f'docker.io/{repo}', image
+        component, _, tag_version = image['tag'].rpartition('-')
+        assert component in pushed and tag_version == version, image
+    assert repo == 'jithendar/custom-harbour'
+    assert '"$IMAGE_REPO:$image-$HARBOR_VERSION"' in SCRIPT
+    assert VALUES['imagePullSecrets'] == [{'name': re.search(r'^PULL_SECRET=(\S+)', SCRIPT, re.M).group(1)}]
     assert VALUES['metrics']['enabled'] is False and VALUES['trivy']['enabled'] is False
 
 
-def test_build_script_pins_source_and_refuses_the_cluster_host():
-    assert re.search(r'^HARBOR_COMMIT=[0-9a-f]{40}\b', BUILD, re.M)
-    assert '[ "$(git rev-parse HEAD)" = "$HARBOR_COMMIT" ]' in BUILD
-    assert "grep -qx mk4" in BUILD and "'{{.Server.Arch}}')\" = arm64" in BUILD
-    assert 'PULL_BASE_FROM_DOCKERHUB=false' in BUILD and 'make/photon/common/Dockerfile' in BUILD
-    subprocess.run(['bash', '-n', str(HARBOR / 'build-images.sh')], check=True)
-    workflow = yaml.safe_load((ROOT / '.github/workflows/build-harbor-images.yml').read_text())
-    assert set(workflow[True]) == {'workflow_dispatch'}   # PyYAML reads the key "on" as True
-    assert workflow['jobs']['build']['runs-on'] == 'ubuntu-24.04-arm'
+def test_script_pins_source_refuses_the_cluster_host_and_deploys_from_master():
+    assert re.search(r'^HARBOR_COMMIT=[0-9a-f]{40}\b', SCRIPT, re.M)
+    assert '[ "$(git -C "$WORK/harbor" rev-parse HEAD)" = "$HARBOR_COMMIT" ]' in SCRIPT
+    assert "grep -qx mk4" in SCRIPT and "'{{.Server.Arch}}')\" = arm64" in SCRIPT
+    assert 'PULL_BASE_FROM_DOCKERHUB=false' in SCRIPT and 'make/photon/common/Dockerfile' in SCRIPT
+    # Argo CD renders from master, so the deploy refuses a checkout that differs from it.
+    assert 'git -C "$ROOT" diff --quiet origin/master -- deploy/minikube/harbor' in SCRIPT
+    assert '--services harbor --apply' in SCRIPT and 'scripts/argocd/deploy.py" harbor' in SCRIPT
+    # The Docker Hub token goes to kubectl on stdin, never argv.
+    assert 'DOCKERHUB_TOKEN="$token" python3 -c' in SCRIPT and '--docker-password' not in SCRIPT
+    subprocess.run(['bash', '-n', str(HARBOR / 'deploy-harbor.sh')], check=True)
+    assert not (HARBOR / 'build-images.sh').exists()
+    assert not (ROOT / '.github/workflows/build-harbor-images.yml').exists()
+
+
+def test_script_rejects_unknown_arguments_without_side_effects():
+    result = subprocess.run(['bash', str(HARBOR / 'deploy-harbor.sh'), '--bogus'], capture_output=True, text=True)
+    assert result.returncode == 1 and 'unknown argument' in result.stderr
 
 
 def references_to(secret):
