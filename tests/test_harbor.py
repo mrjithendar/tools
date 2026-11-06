@@ -254,6 +254,22 @@ def test_database_and_redis_volumes_survive_prune_and_sync_first():
     assert VALUES['persistence']['resourcePolicy'] == 'keep'
 
 
+def test_nothing_waits_on_a_later_sync_wave():
+    # Argo CD waits for each wave to be healthy before the next: a wave -1 Certificate whose Issuer sat in wave 0
+    # never became Ready, and the first sync hung.
+    def wave(doc):
+        return int(doc['metadata'].get('annotations', {}).get('argocd.argoproj.io/sync-wave', '0'))
+    for certificate in by_name('Certificate').values():
+        ref = certificate['spec']['issuerRef']
+        if ref.get('kind', 'Issuer') == 'Issuer':
+            assert wave(by_name('Issuer')[ref['name']]) < wave(certificate), certificate['metadata']['name']
+    for workload in by_name('StatefulSet').values():
+        for volume in workload['spec']['template']['spec']['volumes']:
+            if 'persistentVolumeClaim' in volume:
+                claim = by_name('PersistentVolumeClaim')[volume['persistentVolumeClaim']['claimName']]
+                assert wave(claim) <= wave(workload), volume
+
+
 def test_redis_password_never_reaches_a_command_line():
     container = by_name('StatefulSet')['harbor-redis']['spec']['template']['spec']['containers'][0]
     script = container['args'][0]
