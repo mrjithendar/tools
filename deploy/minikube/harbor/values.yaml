@@ -2,7 +2,7 @@
 # Every key below was checked against that chart version's values.yaml and templates. README.md explains the choices.
 #
 # Settings this repository did not already establish, and so are deployment prerequisites (README.md "Prerequisites"):
-# - the registry hostname (DNS A record) and the ECR registry holding the arm64 Harbor images;
+# - the registry hostname (DNS A record) and the private Docker Hub repository holding the arm64 Harbor images;
 # - the node that holds Harbor's volumes (nodeSelector below);
 # - the Secret harbor/harbor-credentials (./create-secrets.sh --services harbor --apply).
 #
@@ -36,11 +36,12 @@ expose:
 # Deployment's ca-download volume with no source, which the API server rejects.
 caSecretName: harbor-public-tls
 
-# Official goharbor images are amd64-only and every mk4 node is arm64. build-images.sh builds these from the
-# v2.15.4 source and pushes them to ECR, which stays reachable when Harbor is not (bootstrap, rebuilds).
-# ecr-pull is the existing ECR pull Secret; the ecr-refresh CronJob keeps it current in every namespace.
+# Official goharbor images are amd64-only and every mk4 node is arm64. deploy-harbor.sh builds these from the
+# v2.15.4 source and pushes them to the private Docker Hub repository jithendar/custom-harbour, one tag per
+# component (<component>-v2.15.4). Docker Hub stays reachable when Harbor is not (bootstrap, rebuilds).
+# deploy-harbor.sh creates dockerhub-pull from your Docker Hub user and access token.
 imagePullSecrets:
-- name: ecr-pull
+- name: dockerhub-pull
 
 # Harbor has no multi-node mode here: one replica of everything, on the node that holds the volumes.
 updateStrategy:
@@ -109,8 +110,8 @@ redis:
 
 portal:
   image:
-    repository: 881026659929.dkr.ecr.us-east-1.amazonaws.com/harbor/harbor-portal
-    tag: v2.15.4
+    repository: docker.io/jithendar/custom-harbour
+    tag: harbor-portal-v2.15.4
   replicas: 1
   resources:
     requests: {cpu: 10m, memory: 32Mi}
@@ -120,8 +121,8 @@ portal:
 
 core:
   image:
-    repository: 881026659929.dkr.ecr.us-east-1.amazonaws.com/harbor/harbor-core
-    tag: v2.15.4
+    repository: docker.io/jithendar/custom-harbour
+    tag: harbor-core-v2.15.4
   replicas: 1
   # Key "secret".
   existingSecret: harbor-credentials
@@ -145,8 +146,8 @@ core:
 
 jobservice:
   image:
-    repository: 881026659929.dkr.ecr.us-east-1.amazonaws.com/harbor/harbor-jobservice
-    tag: v2.15.4
+    repository: docker.io/jithendar/custom-harbour
+    tag: harbor-jobservice-v2.15.4
   replicas: 1
   maxJobWorkers: 4
   # Job logs in PostgreSQL instead of a second PVC; they are swept after loggerSweeperDuration days.
@@ -187,8 +188,8 @@ registry:
     dryrun: false
   registry:
     image:
-      repository: 881026659929.dkr.ecr.us-east-1.amazonaws.com/harbor/registry-photon
-      tag: v2.15.4
+      repository: docker.io/jithendar/custom-harbour
+      tag: registry-photon-v2.15.4
     resources:
       requests: {cpu: 100m, memory: 128Mi}
       limits: {cpu: '1', memory: 1Gi}
@@ -199,8 +200,8 @@ registry:
         secretKeyRef: {name: harbor-credentials, key: REDIS_PASSWORD}
   controller:
     image:
-      repository: 881026659929.dkr.ecr.us-east-1.amazonaws.com/harbor/harbor-registryctl
-      tag: v2.15.4
+      repository: docker.io/jithendar/custom-harbour
+      tag: harbor-registryctl-v2.15.4
     resources:
       requests: {cpu: 10m, memory: 32Mi}
       limits: {cpu: 500m, memory: 256Mi}
@@ -216,8 +217,8 @@ registry:
 trivy:
   enabled: false
   image:
-    repository: 881026659929.dkr.ecr.us-east-1.amazonaws.com/harbor/trivy-adapter-photon
-    tag: v2.15.4
+    repository: docker.io/jithendar/custom-harbour
+    tag: trivy-adapter-photon-v2.15.4
   replicas: 1
   skipUpdate: false
   resources:
