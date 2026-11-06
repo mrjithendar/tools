@@ -29,6 +29,27 @@ spec:
         runAsUser: 999
         runAsGroup: 999
         runAsNonRoot: true
+      # minikube's hostpath volumes are root-owned and ignore fsGroup, so Valkey (uid 999) could not write
+      # /data ("Can't open or create append-only dir: Permission denied"). Hand the volume over once, as root
+      # with only CAP_CHOWN.
+      initContainers:
+      - name: chown-data
+        image: valkey/valkey:8.1.11-alpine
+        command: [chown, '999:999', /data]
+        securityContext:
+          runAsUser: 0
+          runAsNonRoot: false
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+            add: [CHOWN]
+        resources:
+          requests: {cpu: 10m, memory: 16Mi}
+          limits: {cpu: 100m, memory: 32Mi}
+        volumeMounts:
+        - name: data
+          mountPath: /data
       containers:
       - name: valkey
         image: valkey/valkey:8.1.11-alpine

@@ -173,6 +173,26 @@ jobservice:
 
 registry:
   replicas: 1
+  # minikube's hostpath volumes are root-owned and ignore the chart's fsGroup 10000, so the registry could not
+  # write /storage. Hand the volume over once, as root with only CAP_CHOWN (busybox: also used in README.md).
+  initContainers:
+  - name: chown-storage
+    image: busybox:1.37
+    command: [chown, '10000:10000', /storage]
+    securityContext:
+      runAsUser: 0
+      runAsNonRoot: false
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: [ALL]
+        add: [CHOWN]
+    resources:
+      requests: {cpu: 10m, memory: 16Mi}
+      limits: {cpu: 100m, memory: 32Mi}
+    volumeMounts:
+    - name: registry-data
+      mountPath: /storage
   # Key REGISTRY_HTTP_SECRET.
   existingSecret: harbor-credentials
   existingSecretKey: REGISTRY_HTTP_SECRET
