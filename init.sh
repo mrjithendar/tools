@@ -35,3 +35,5 @@ if ! command -v python3 >/dev/null; then
   esac
 fi
 exec python3 "$ROOT/scripts/setup/initialize.py" "${ORIGINAL_ARGS[@]}"
+
+dnf install -y httpd-tools
