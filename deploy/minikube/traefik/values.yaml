@@ -30,6 +30,12 @@ ports:
     nodePort: 30443
     proxyProtocol:
       trustedIPs: ["192.168.49.0/24"]
+    # Traefik v3 reads each whole request, body included, within readTimeout (default 60s). A Docker push sends a
+    # layer as one request, and a 1 GB layer at 10 MB/s takes 100s (Harbor: ../harbor/README.md). The HAProxy in
+    # front (../expose-ingress.sh) only times out after an hour idle. Write and idle timeouts keep their defaults.
+    transport:
+      respondingTimeouts:
+        readTimeout: 900s
 # HTTP stays available for cert-manager's HTTP-01 challenges.
 # Grafana's own Ingress is HTTPS-only. The dashboard is not exposed.
 ingressRoute:

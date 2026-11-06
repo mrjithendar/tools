@@ -19,6 +19,8 @@ SITE = Path(os.environ.get('JITHENDAR_COM_DIR', TOOLS.parent / 'jithendar.com'))
 ARGOCD = APP / 'argocd-eks'                         # roboshop-ai's Argo CD Applications for EKS
 MONITORING_ARGOCD = TOOLS / 'deploy/minikube/applications'                # monitoring stack Applications (Grafana, Prometheus, Loki)
 CATALOGS = (MONITORING_ARGOCD,)
+# Opt-in Applications (Harbor): deployed only when named, never by "all"; validated with CATALOGS.
+OPTIONAL_ARGOCD = MONITORING_ARGOCD / 'optional'
 TOOLS_REPO = 'https://github.com/mrjithendar/tools.git'
 APP_REPO = 'https://github.com/mrjithendar/roboshop-ai.git'
 SITE_REPO = 'https://github.com/mrjithendar/jithendar.com.git'

@@ -1,0 +1,8 @@
+# Signs only the token-service key pair below; nothing outside Harbor trusts it.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: harbor-token-selfsigned
+  namespace: harbor
+spec:
+  selfSigned: {}

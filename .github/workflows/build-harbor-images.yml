@@ -1,0 +1,37 @@
+name: Build Harbor images (arm64)
+
+# Manual only. Builds the arm64 Harbor images deploy/minikube/harbor/values.yaml uses and pushes them to ECR.
+# Run once before the first Harbor sync, and again only when the Harbor version in build-images.sh changes.
+# Needs repository secrets HARBOR_BUILD_AWS_ACCESS_KEY_ID / HARBOR_BUILD_AWS_SECRET_ACCESS_KEY for an IAM user that
+# can push to harbor/* in ECR (deploy/minikube/harbor/README.md "Images").
+on:
+  workflow_dispatch:
+    inputs:
+      with_trivy:
+        description: Also build the Trivy adapter
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-harbor-images
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Native arm64: build-images.sh refuses an emulated Docker server. Never the mk4 host (runner/README.md).
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    env:
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ${{ secrets.HARBOR_BUILD_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.HARBOR_BUILD_AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build and push
+        run: bash deploy/minikube/harbor/build-images.sh ${{ inputs.with_trivy && '--with-trivy' || '' }}

@@ -13,7 +13,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/lib'))
-from repos import CATALOGS, MONITORING_ARGOCD  # noqa: E402
+from repos import CATALOGS, MONITORING_ARGOCD, OPTIONAL_ARGOCD  # noqa: E402
 ARGOCD_CHART_VERSION = '10.10.5'
 
 
@@ -26,6 +26,14 @@ def catalog():
     names = [d['metadata']['name'] for d in docs]
     if dupes := {n for n in names if names.count(n) > 1}:
         raise RuntimeError(f'Defined in more than one catalog: {sorted(dupes)}')
+    return ({d['metadata']['name']: d for d in docs if d['kind'] == 'Application'},
+            {d['metadata']['name']: d for d in docs if d['kind'] == 'AppProject'})
+
+
+def optional_catalog():
+    """Opt-in Applications and their AppProjects (applications/optional): selectable by name, never by 'all'."""
+    resources = yaml.safe_load((OPTIONAL_ARGOCD / 'kustomization.yaml').read_text())['resources']
+    docs = [yaml.safe_load((OPTIONAL_ARGOCD / name).read_text()) for name in resources]
     return ({d['metadata']['name']: d for d in docs if d['kind'] == 'Application'},
             {d['metadata']['name']: d for d in docs if d['kind'] == 'AppProject'})
 
@@ -72,9 +80,15 @@ def main():
     # cert-manager. It is never included by 'all' on a fresh Helm bootstrap.
     if 'cert-manager' in args.apps:
         apps['cert-manager'] = yaml.safe_load((MONITORING_ARGOCD / 'cert-manager.yaml').read_text())
+    optional_apps, optional_projects = optional_catalog()
+    for name in set(args.apps) & optional_apps.keys():
+        apps[name] = optional_apps[name]
+        project = optional_apps[name]['spec']['project']
+        projects[project] = optional_projects[project]
     if args.apps == ['list']:
         print('all: every Application registered in tools/deploy/minikube/applications')
         print('Available apps: ' + ' '.join(sorted(apps)))
+        print('Opt-in apps (by name only, never in all): ' + ' '.join(sorted(optional_apps)))
         return
     if args.timeout <= 0:
         parser.error('--timeout must be positive')
@@ -148,9 +162,10 @@ def main():
             break
     if args.apps == ['status']:
         print(run('get', 'applications'), end='')
+        known = {**optional_apps, **apps}
         for app in json.loads(run('get', 'applications', '-o', 'json'))['items']:
             name = app['metadata']['name']
-            if name in apps and source_drift(app, apps[name]):
+            if name in known and source_drift(app, known[name]):
                 print(f'WARNING: {name}: live source/destination differs from Git; '
                       f'./deploy-argocd.sh {name} aligns it before syncing')
             if not app.get('status', {}).get('resources'):

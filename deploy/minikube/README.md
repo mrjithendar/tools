@@ -9,6 +9,7 @@ The self-hosted cluster: Argo CD hub, Traefik, cert-manager and the monitoring s
 | `observability/` | Prometheus chart, Grafana values and dashboards, Loki and Alloy, OpenTelemetry collector, Jaeger | Argo CD, through `applications/` |
 | `argocd/`, `cert-manager/`, `traefik/`, `metrics-server/`, `namespaces/` | Controller values and manifests | `./bootstrap-cluster.sh`, Argo CD |
 | `vault/`, `jfrog/`, `ecr-refresh/` | Optional components | Their own scripts and READMEs |
+| `harbor/` | Opt-in private registry ([README](harbor/README.md)) | Argo CD, `applications/optional/harbor.yaml`, by name only |
 | `examples/` | Templates. Nothing applies them. | By hand |
 
 Kustomize stays here: `kubectl apply -k deploy/minikube/argocd` and the catalog in `applications/kustomization.yaml` are part of how this cluster is deployed.

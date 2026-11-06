@@ -15,8 +15,9 @@ The first command is an offline preview. The second creates missing namespaces a
 | monitoring | monitoring-auth | Shared Grafana/Prometheus admin credentials |
 | jithendar | wordpress-credentials | WordPress admin, MySQL and Redis passwords |
 | jfrog | jfrog-bootstrap | Optional JFrog database, admin and encryption credentials |
+| harbor | harbor-credentials | Optional Harbor admin, encryption key, component secrets, PostgreSQL and Redis passwords ([details](../../deploy/minikube/harbor/README.md)); needs `htpasswd` |
 
-Include JFrog with `--all`, or select installations with `--services monitoring wordpress`. Add `--ecr` to refresh repository-managed ECR pull secrets using your existing AWS authentication. ECR tokens expire after 12 hours; this command does not install the scheduled refresher.
+Include JFrog and Harbor with `--all`, or select installations with `--services monitoring wordpress`. Add `--ecr` to refresh repository-managed ECR pull secrets using your existing AWS authentication. ECR tokens expire after 12 hours; this command does not install the scheduled refresher.
 
 ```bash
 ./create-secrets.sh --context mk4 --all --ecr --apply
