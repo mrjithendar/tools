@@ -155,27 +155,93 @@ exercises the read timeout and the absence of size limits:
 
 ```bash
 echo "$HARBOR_ROBOT_SECRET" | docker login registry.jithendar.com -u 'robot$moks+ci' --password-stdin
-printf 'FROM busybox:1.37\nRUN head -c 1500000000 /dev/urandom > /blob\n' | docker build -t registry.jithendar.com/moks/push-test:1 -
-time docker push registry.jithendar.com/moks/push-test:1
+printf 'FROM busybox:1.37\nRUN head -c 1500000000 /dev/urandom > /blob\n' | docker build -t registry.jithendar.com/jithendar/push-test:1 -
+time docker push registry.jithendar.com/jithendar/push-test:1
 ```
 
 **Pull through the node runtime** (kubelet and containerd, not a pod's network), with the read-only robot's Secret
 in the namespace (Kubernetes pull access):
 
 ```bash
-kubectl --context mk4 -n moks run harbor-pull-test --restart=Never --image=registry.jithendar.com/moks/push-test:1 \
+kubectl --context mk4 -n moks run harbor-pull-test --restart=Never --image=registry.jithendar.com/jithendar/push-test:1 \
   --overrides='{"spec":{"imagePullSecrets":[{"name":"harbor-pull"}],"nodeSelector":{"kubernetes.io/hostname":"mk4-m02"}}}' -- true
 kubectl --context mk4 -n moks get pod harbor-pull-test -w      # Completed, not ErrImagePull
 kubectl --context mk4 -n moks delete pod harbor-pull-test
 ```
 
-Then delete `moks/push-test` in the portal.
+Then delete `jithendar/push-test` in the portal.
 
 ## Projects and robot accounts
 
-Three private projects, one CI robot per project (push and pull, that project only), and one read-only robot for
-Kubernetes across all three. Run from a machine with kubectl access to mk4. The admin password goes to curl on
-stdin, not its command line:
+Every image the repositories build lives in **one private project, `jithendar`**, and is pushed and pulled as
+`:latest` only:
+
+```bash
+docker tag SOURCE_IMAGE registry.jithendar.com/jithendar/REPOSITORY:latest
+docker push registry.jithendar.com/jithendar/REPOSITORY:latest
+```
+
+| Repository | Images (`registry.jithendar.com/jithendar/…`) | CI robot |
+|---|---|---|
+| moks | `moks`, `moks-crewai`, `moks-reranker`, `moks-terminal`, `moks-opensearch` | `robot$jithendar+moks` |
+| jithendar.com | `jithendar-com`, `practice-executor`, `practice-sandbox` | `robot$jithendar+jithendar-com` |
+| roboshop-ai | `roboshop-<service>` (`roboshop-shipping` for shipping-service) | `robot$jithendar+roboshop-ai` |
+| tools | none in Harbor: `jithendar/custom-harbour` stays on Docker Hub (Harbor cannot pull itself) | — |
+
+[`registry.py`](registry.py) does the setup through Harbor's API, from a machine with kubectl access to mk4 (it reads
+the admin password from `harbor-credentials`). No secret is printed or put on a command line:
+
+```bash
+python3 deploy/minikube/harbor/registry.py project        # private project "jithendar"
+python3 deploy/minikube/harbor/registry.py ci-robots      # needs gh, signed in
+python3 deploy/minikube/harbor/registry.py pull-secrets   # Secret harbor-pull in jithendar, moks, moks-terminals, moks-diagnostics
+python3 deploy/minikube/harbor/registry.py copy-from-ecr  # optional, once: see Moving off ECR
+```
+
+- **CI robots** can push and pull in `jithendar` only. `ci-robots` sets `HARBOR_USERNAME` and `HARBOR_PASSWORD`
+  as Actions secrets in each GitHub repository; the workflows log in with
+  `printf '%s' "$HARBOR_PASSWORD" | docker login registry.jithendar.com -u "$HARBOR_USERNAME" --password-stdin`.
+  They expire after 365 days and CI then fails at login: run `registry.py ci-robots --rotate`.
+- **Kubernetes robot** `robot$k8s-pull` is system level, pull only, and never expires (an expired pull secret only
+  shows up when a pod restarts). `pull-secrets` writes it as `harbor-pull` into each namespace; workloads name it in
+  `imagePullSecrets`. Keep its secret in your password manager: a namespace created later
+  (`registry.py pull-secrets --namespace NAME` asks for it) and a restore need it again. `--rotate` issues a new one
+  and rewrites every namespace.
+
+An existing robot keeps its secret unless `--rotate` is given, so every command is safe to rerun.
+
+## Kubernetes pull access
+
+Pods pull our images from Harbor only, through `imagePullSecrets: [{name: harbor-pull}]` in each workload (Git, so
+Argo CD and `kubectl apply` keep it). Third-party images (postgres, OpenSearch, Valkey, Kafka, busybox) still come
+from their own registries at pinned versions, and Harbor's own images from Docker Hub.
+
+Every image runs `:latest` with `imagePullPolicy: Always`, so **while Harbor is down no pod that starts or restarts
+can start**, even with the image cached on the node. Harbor itself is not affected: nothing it runs comes from Harbor.
+
+### Moving off ECR
+
+1. Harbor is up and `https://registry.jithendar.com` answers (Verify). Traefik's 900s read timeout is applied
+   (Prerequisites): the MOKS images have layers over 1 GB.
+2. `registry.py project`, `ci-robots`, `pull-secrets`.
+3. Optional: `aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin
+   881026659929.dkr.ecr.us-east-1.amazonaws.com`, `docker login registry.jithendar.com`, then `registry.py
+   copy-from-ecr`. It copies each `:latest` (every platform), so pods can pull before CI has pushed.
+   Otherwise run each repository's release workflow once before its manifests change.
+4. Merge the `feat/harbor-registry` branch of each repository. The workflows push to Harbor; manifests pull from it.
+5. Once no pod runs an ECR image (`kubectl --context mk4 get pods -A -o jsonpath='{..image}' | tr ' ' '\n' | grep dkr.ecr`
+   prints nothing), retire `ecr-pull`: suspend `roboshop-ai/ecr-refresh` and delete the ECR repositories in
+   Terraform (`infrastructure/eks_ecr.tf` here applies on master, so review that plan on its own).
+
+## Retention and garbage collection
+
+CI pushes `:latest` only, and the cluster runs `:latest` with `imagePullPolicy: Always`. Each push leaves the build
+it replaced untagged, and those are the rollback window: roll back by pointing `latest` at an earlier build's digest
+(MOKS keeps them in its release records):
+`docker buildx imagetools create --tag registry.jithendar.com/jithendar/IMAGE:latest registry.jithendar.com/jithendar/IMAGE@sha256:…`.
+So the policy keeps the **last ten pushes of each repository, untagged ones included** (`"untagged": true`), and
+garbage collection must not delete untagged artifacts itself (`delete_untagged: false`): retention decides. It runs
+daily at 03:00 UTC. The calls below use this helper; the admin password goes to curl on stdin:
 
 ```bash
 harbor() {   # harbor METHOD PATH [curl args...]
@@ -186,101 +252,19 @@ harbor() {   # harbor METHOD PATH [curl args...]
       "https://registry.jithendar.com/api/v2.0$path" "$@"
 }
 
-for project in moks roboshop-ai jithendar-com; do
-  harbor POST /projects -d "{\"project_name\":\"$project\",\"public\":false,\"metadata\":{\"public\":\"false\"}}"
-done
+id=$(harbor GET /projects/jithendar | python3 -c 'import json,sys; print(json.load(sys.stdin)["project_id"])')
+repos='{"repository":[{"kind":"doublestar","decoration":"repoMatches","pattern":"**"}]}'
+harbor POST /retentions -d "{\"algorithm\":\"or\",\"scope\":{\"level\":\"project\",\"ref\":$id},
+  \"trigger\":{\"kind\":\"Schedule\",\"settings\":{\"cron\":\"0 0 3 * * *\"}},\"rules\":[
+  {\"action\":\"retain\",\"template\":\"latestPushedK\",\"params\":{\"latestPushedK\":10},\"scope_selectors\":$repos,
+   \"tag_selectors\":[{\"kind\":\"doublestar\",\"decoration\":\"matches\",\"pattern\":\"**\",\"extras\":\"{\\\"untagged\\\":true}\"}]}]}"
 ```
 
-**CI robots.** A robot's secret is shown once, so pipe it straight into the repository's Actions secrets
-(`gh` reads stdin). They expire after 365 days, when CI fails visibly; refresh the secret in the portal
-(Robot Accounts) and set it again.
-
-```bash
-ci_robot() {   # ci_robot PROJECT GITHUB_REPO
-  harbor POST /robots -d "{\"name\":\"ci\",\"level\":\"project\",\"duration\":365,\"permissions\":[{\"kind\":\"project\",\"namespace\":\"$1\",\"access\":[{\"resource\":\"repository\",\"action\":\"push\"},{\"resource\":\"repository\",\"action\":\"pull\"}]}]}" |
-    python3 -c 'import json,sys; print(json.load(sys.stdin)["secret"])' | gh secret set HARBOR_ROBOT_SECRET -R "$2"
-}
-ci_robot moks mrjithendar/moks                    # user robot$moks+ci
-ci_robot roboshop-ai mrjithendar/roboshop-ai      # user robot$roboshop-ai+ci
-ci_robot jithendar-com mrjithendar/jithendar.com  # user robot$jithendar-com+ci
-```
-
-In a workflow: `echo "$HARBOR_ROBOT_SECRET" | docker login registry.jithendar.com -u 'robot$moks+ci' --password-stdin`.
-Single-quote the user name: `$moks` is not a variable. Changing the workflows is work in those repositories.
-
-**Kubernetes robot.** System level, pull only, on the three projects. It never expires (`duration: -1`):
-an expired pull secret only shows up when a pod restarts and cannot pull. Rotate it by hand once a year. Keep the
-secret in your password manager; it is needed again after a restore.
-
-```bash
-harbor POST /robots -d '{"name":"k8s-pull","level":"system","duration":-1,"permissions":[
-  {"kind":"project","namespace":"moks","access":[{"resource":"repository","action":"pull"}]},
-  {"kind":"project","namespace":"roboshop-ai","access":[{"resource":"repository","action":"pull"}]},
-  {"kind":"project","namespace":"jithendar-com","access":[{"resource":"repository","action":"pull"}]}]}' |
-  python3 -c 'import json,sys; print(json.load(sys.stdin)["secret"])'      # user robot$k8s-pull
-```
-
-## Kubernetes pull access
-
-Create `harbor-pull` in each namespace that pulls from Harbor. The secret is typed at a prompt and goes to kubectl
-on stdin:
-
-```bash
-python3 - <<'EOF' | kubectl --context mk4 -n moks apply -f -
-import base64, getpass, json
-auth = base64.b64encode(('robot$k8s-pull:' + getpass.getpass('robot$k8s-pull secret: ')).encode()).decode()
-config = json.dumps({'auths': {'registry.jithendar.com': {'auth': auth}}})
-print(json.dumps({'apiVersion': 'v1', 'kind': 'Secret', 'type': 'kubernetes.io/dockerconfigjson',
-                  'metadata': {'name': 'harbor-pull'},
-                  'data': {'.dockerconfigjson': base64.b64encode(config.encode()).decode()}}))
-EOF
-```
-
-Then attach it, in the workload's own repository:
-
-- **Per workload (preferred, GitOps):** `spec.template.spec.imagePullSecrets: [{name: harbor-pull}]`.
-- **Per namespace:** add it to the ServiceAccount the pods use. For `default`, which `ecr-refresh` already patches
-  (it keeps other entries):
-  `kubectl --context mk4 -n moks patch serviceaccount default --type=json -p '[{"op":"add","path":"/imagePullSecrets/-","value":{"name":"harbor-pull"}}]'`.
-  If Argo CD manages that ServiceAccount, put the change in Git instead, or the next sync removes it.
-
-Keep `ecr-pull` until no image in the namespace comes from ECR.
-
-## Retention and garbage collection
-
-CI pushes every build twice, `:<commit sha>` (the sandbox uses `py3.13-<sha>`) and `:latest`, and the cluster runs
-`:latest` with `imagePullPolicy: Always`. Rolling back means pointing a Deployment at an older sha tag, or
-re-tagging it as `latest`. The policy per project, where an artifact survives if **any** rule keeps it:
-
-| Rule | Keeps |
-|---|---|
-| `always` on tags `{latest,v*}` | what runs, and releases |
-| `latestPushedK` 10 | the last ten builds of each repository: the rollback window |
-| `nDaysSinceLastPull` 30 | anything a node pulled in the last 30 days, such as a pinned sha |
-
-Untagged artifacts are excluded from every rule (`"untagged": false`), so retention removes them. It runs daily at 03:00 UTC.
-
-```bash
-for project in moks roboshop-ai jithendar-com; do
-  id=$(harbor GET "/projects/$project" | python3 -c 'import json,sys; print(json.load(sys.stdin)["project_id"])')
-  repos='{"repository":[{"kind":"doublestar","decoration":"repoMatches","pattern":"**"}]}'
-  tags() { echo "[{\"kind\":\"doublestar\",\"decoration\":\"matches\",\"pattern\":\"$1\",\"extras\":\"{\\\"untagged\\\":false}\"}]"; }
-  harbor POST /retentions -d "{\"algorithm\":\"or\",\"scope\":{\"level\":\"project\",\"ref\":$id},
-    \"trigger\":{\"kind\":\"Schedule\",\"settings\":{\"cron\":\"0 0 3 * * *\"}},\"rules\":[
-    {\"action\":\"retain\",\"template\":\"always\",\"params\":{},\"tag_selectors\":$(tags '{latest,v*}'),\"scope_selectors\":$repos},
-    {\"action\":\"retain\",\"template\":\"latestPushedK\",\"params\":{\"latestPushedK\":10},\"tag_selectors\":$(tags '**'),\"scope_selectors\":$repos},
-    {\"action\":\"retain\",\"template\":\"nDaysSinceLastPull\",\"params\":{\"nDaysSinceLastPull\":30},\"tag_selectors\":$(tags '**'),\"scope_selectors\":$repos}]}"
-  # Release tags cannot be overwritten or deleted.
-  harbor POST "/projects/$project/immutabletagrules" -d "{\"action\":\"immutable\",\"template\":\"immutable_template\",
-    \"tag_selectors\":[{\"kind\":\"doublestar\",\"decoration\":\"matches\",\"pattern\":\"v*\"}],\"scope_selectors\":$repos}"
-done
-```
-
-**Preview before the first scheduled run.** In the portal, a project's Policy tab has **DRY RUN**: it lists
+**Preview before the first scheduled run.** In the portal, the project's Policy tab has **DRY RUN**: it lists
 what would be deleted and deletes nothing. The same through the API:
 
 ```bash
-policy=$(harbor GET /projects/moks/metadatas/retention_id | python3 -c 'import json,sys; print(json.load(sys.stdin)["retention_id"])')
+policy=$(harbor GET /projects/jithendar/metadatas/retention_id | python3 -c 'import json,sys; print(json.load(sys.stdin)["retention_id"])')
 harbor POST "/retentions/$policy/executions" -d '{"dry_run":true}'
 harbor GET "/retentions/$policy/executions"      # then .../executions/ID/tasks and .../tasks/ID for each log
 ```
@@ -290,9 +274,9 @@ blobs stay on the volume until GC removes every blob that no manifest references
 UTC, outside the backup window (02:30). Preview it with `"dry_run":true` and `"type":"Manual"` first:
 
 ```bash
-harbor POST /system/gc/schedule -d '{"schedule":{"type":"Manual"},"parameters":{"delete_untagged":true,"dry_run":true,"workers":1}}'
+harbor POST /system/gc/schedule -d '{"schedule":{"type":"Manual"},"parameters":{"delete_untagged":false,"dry_run":true,"workers":1}}'
 harbor GET /system/gc | head -c 600                 # status; the portal shows the log and the space it would free
-harbor POST /system/gc/schedule -d '{"schedule":{"type":"Custom","cron":"0 0 4 * * 6"},"parameters":{"delete_untagged":true,"dry_run":false,"workers":1}}'
+harbor POST /system/gc/schedule -d '{"schedule":{"type":"Custom","cron":"0 0 4 * * 6"},"parameters":{"delete_untagged":false,"dry_run":false,"workers":1}}'
 ```
 
 (A schedule that already exists is changed with `PUT` on the same path.)
