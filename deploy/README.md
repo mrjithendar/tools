@@ -30,8 +30,8 @@ kubectl --context mk4 diff -f deploy/eks/applications/
 kubectl --context mk4 apply -f deploy/eks/applications/
 ./deploy-argocd.sh status --context mk4                         # warns about Minikube apps with stale specs
 
-# 2. Align and sync the Minikube apps. This only re-applies what Git already has, without prune.
-./deploy-argocd.sh metrics-server grafana prometheus loki --context mk4
+# 2. The Minikube add-ons are Terraform releases, not Applications (minikube-infrastructure/README.md).
+terraform -chdir=minikube-infrastructure apply -var-file=vars/mk4.tfvars
 
 # 3. Check the EKS apps show no change, then sync them.
 for a in letsencrypt-issuers ingress bootstrap; do

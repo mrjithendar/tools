@@ -38,6 +38,25 @@ data:
             replacement: /api/v1/nodes/$1/proxy/{{ $path }}
       {{- end }}
       {{- end }}
+      {{- if and .Values.kubernetesMetrics.enabled .Values.istioMetrics.enabled }}
+      # Istio control plane and sidecars (Kiali, https://jithendar.com/kiali/). Same jobs as Istio's samples/addons
+      # prometheus.yaml. Sidecars exist only in namespaces labelled istio-injection=enabled.
+      - job_name: istiod
+        static_configs:
+          - targets: ["istiod.istio-system.svc.cluster.local:15014"]
+      - job_name: envoy-stats
+        metrics_path: /stats/prometheus
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            action: keep
+            regex: '.*-envoy-prom'
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+      {{- end }}
       {{- with .Values.extraScrapeConfigs }}
       {{- toYaml . | nindent 6 }}
       {{- end }}

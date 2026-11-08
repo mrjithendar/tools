@@ -1,20 +1,19 @@
 # Observability
 
-All observability workloads are deployed by Argo CD from this directory. Argo CD
-deploys the Git revision on `master`, so commit and push changes before syncing.
+All observability workloads are Terraform Helm releases ([`minikube-infrastructure/`](../../../minikube-infrastructure/README.md))
+built from this directory. Terraform applies the local checkout, not `master`.
 
-| Signal | Component | Argo CD Application | Namespace | Source |
+| Signal | Component | Helm release | Namespace | Source |
 | --- | --- | --- | --- | --- |
 | Metrics | Prometheus 3.15 | `prometheus` | `monitoring` | [`prometheus/`](prometheus/README.md) (local Helm chart) |
 | Dashboards | Grafana (community chart 14.0.1) | `grafana` | `monitoring` | [`grafana/values.yaml`](grafana/README.md) |
-| Logs | Loki 3.7.9 + Alloy 1.21.2 | `loki` | `monitoring` | [`loki/`](loki/README.md) (Kustomize) |
-| Traces | OpenTelemetry Collector 0.162 → Jaeger 2.22 | `otel-collector`, `jaeger` | `observability` | [`otel-collector/`](otel-collector/) (Kustomize), [`jaeger/`](jaeger/) (Kustomize, `jaeger.yaml`), [design notes](opentelemetry/README.md) |
+| Logs | Loki 3.7.9 + Alloy 1.21.2 | `loki` | `monitoring` | [`loki/`](loki/README.md) (local Helm chart) |
+| Traces | OpenTelemetry Collector 0.162 → Jaeger 2.22 | `otel-collector`, `jaeger` | `observability` | [`otel-collector/`](otel-collector/), [`jaeger/`](jaeger/) (local Helm charts, `jaeger.yaml`), [design notes](opentelemetry/README.md) |
+| Mesh | Kiali 2.34 on Istio 1.30.7 | `kiali`, `istiod`, `istio-base` | `istio-system` | [`../istio/`](../istio/) |
 
 ```bash
-./deploy-argocd.sh prometheus grafana loki --context mk4
+terraform -chdir=minikube-infrastructure apply -var-file=vars/mk4.tfvars
 ```
-
-`deploy-argocd.sh` creates missing Applications and aligns existing ones with Git before syncing.
 
 ## How the pieces connect
 
@@ -30,7 +29,7 @@ deploys the Git revision on `master`, so commit and push changes before syncing.
   `otel-collector.observability.svc.cluster.local:4318` (set in `roboshop-config`),
   which strips sensitive attributes and forwards to Jaeger. The collector's only
   configuration is [`otel-collector/collector.yaml`](otel-collector/collector.yaml);
-  Kustomize turns it into a hash-named ConfigMap, so editing it rolls the collector.
+  its checksum is a pod annotation, so editing it rolls the collector.
   An `ExternalName` Service `roboshop-ai/otel-collector` keeps pods that still use
   the short name `otel-collector:4318` working; remove it once every RoboShop pod
   has restarted with the new endpoint. Jaeger storage is in-memory (`jaeger/jaeger.yaml`, newest 5000 traces),
@@ -72,7 +71,7 @@ to update user ID 1 (the password is passed over stdin, never as an argument).
 
 ```bash
 kubectl --context mk4 -n monitoring get pods,pvc
-kubectl --context mk4 -n argocd get app prometheus grafana loki
+helm --kube-context mk4 list -n monitoring
 python3 -m pytest -q tests/test_loki.py tests/test_yaml_layout.py deploy/minikube/test-monitoring-credentials.py
 ```
 

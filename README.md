@@ -27,7 +27,8 @@ the menu automatically.
 ```bash
 ./init.sh --profile minikube     # host prerequisites: Docker, kubectl, Helm, Minikube
 ./deploy-minikube.sh             # create the cluster
-./bootstrap-cluster.sh           # cert-manager, Traefik, Argo CD, ECR pull secrets
+./bootstrap-cluster.sh           # Traefik, Argo CD, ECR pull secrets
+terraform -chdir=minikube-infrastructure apply -var-file=vars/mk4.tfvars   # cert-manager, Istio, Kiali, monitoring (minikube-infrastructure/README.md)
 ./create-secrets.sh --apply      # missing installation credentials
 ./deploy-argocd.sh roboshop      # register and sync the RoboShop applications
 ```
@@ -40,7 +41,7 @@ Every entry point can run from any directory, and most accept `--help`.
 |---|---|
 | `./init.sh [--profile dev\|docker\|minikube\|aws] [--check]` | Install host prerequisites. No cluster or cloud changes. |
 | `./deploy-minikube.sh` | Create or update the Minikube cluster (`deploy/minikube/install.sh`). |
-| `./bootstrap-cluster.sh` | Install cert-manager and Traefik with Helm, then Argo CD and its ingress; refresh ECR pull secrets. `--schedule-pull-secrets` adds a six-hourly refresh CronJob ([details](deploy/minikube/ecr-refresh/README.md)). |
+| `./bootstrap-cluster.sh` | Install Traefik with Helm, then Argo CD and its ingress; refresh ECR pull secrets. `--schedule-pull-secrets` adds a six-hourly refresh CronJob ([details](deploy/minikube/ecr-refresh/README.md)). |
 | `./create-secrets.sh [--apply] [--all]` | Create missing installation credentials. Never rotates existing ones. |
 | `./deploy-argocd.sh [app\|all\|roboshop\|list\|status]` | Register and sync Argo CD Applications. |
 | `./deploy-traefik.sh` | Install or upgrade Traefik on its own (`deploy/minikube/deploy-traefik.sh`). |

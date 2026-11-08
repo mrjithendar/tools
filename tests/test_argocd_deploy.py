@@ -10,9 +10,14 @@ deploy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(deploy)
 
 
+# deploy.py's mechanics are tested against the catalog as it was before the add-ons moved to Terraform
+# (fixtures/argocd-catalog/README.md); the live catalog holds no Applications by default.
+FIXTURE_CATALOG = Path(__file__).resolve().parent / 'fixtures/argocd-catalog'
+
+
 @pytest.fixture(autouse=True)
 def no_external_writes():
-    with patch.object(deploy.subprocess, 'check_call'):
+    with patch.object(deploy.subprocess, 'check_call'), patch.object(deploy, 'CATALOGS', (FIXTURE_CATALOG,)):
         yield
 
 
@@ -105,7 +110,7 @@ def test_project_moves_create_git_project_then_align():
 
 def test_missing_git_sync_options_added_and_live_extras_kept():
     # Large ConfigMaps need ServerSideApply; a stale live policy must not drop it.
-    git = deploy.yaml.safe_load((deploy.MONITORING_ARGOCD / 'cert-manager.yaml').read_text())
+    git = deploy.yaml.safe_load((FIXTURE_CATALOG / 'cert-manager.yaml').read_text())
     stale = json.loads(json.dumps(git))
     stale['spec']['syncPolicy'] = {'syncOptions': ['FailOnSharedResource=true', 'RespectIgnoreDifferences=true'],
                                    'retry': {'limit': 2}}
@@ -242,7 +247,7 @@ def test_failed_automatic_install_never_deploys_apps():
 
 @pytest.mark.parametrize('existing', [False, True])
 def test_cert_manager_sync_carries_namespace_and_ssa_options(existing):
-    app = deploy.yaml.safe_load((deploy.MONITORING_ARGOCD / 'cert-manager.yaml').read_text())
+    app = deploy.yaml.safe_load((FIXTURE_CATALOG / 'cert-manager.yaml').read_text())
     options = app['spec']['syncPolicy']['syncOptions']
     if existing:
         options.append('RespectIgnoreDifferences=true')

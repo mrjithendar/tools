@@ -33,7 +33,8 @@ def test_each_active_yaml_is_one_document():
 
 
 def test_each_local_chart_template_renders_at_most_one_resource():
-    for chart in ('deploy/minikube/observability/prometheus','deploy/minikube/cert-manager/issuers'):
+    charts=('prometheus','loki','jaeger','otel-collector','grafana/dashboards')
+    for chart in ('deploy/minikube/cert-manager/issuers',*(f'deploy/minikube/observability/{c}' for c in charts)):
         output=subprocess.check_output(['helm','template','layout',str(ROOT/chart),'-n','layout'],text=True)
         sources=re.findall(r'^# Source: (.+)$',output,re.M)
         assert len(sources)==len(set(sources)),chart

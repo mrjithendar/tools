@@ -93,7 +93,7 @@ def validate(external=False):
             kind=resource['kind'];meta=resource['metadata'];namespace=meta.get('namespace','')
             cluster_kind=kind in ('Namespace','ClusterRole','ClusterRoleBinding','CustomResourceDefinition','APIService','ClusterIssuer','MutatingWebhookConfiguration','ValidatingWebhookConfiguration')
             if not namespace and not cluster_kind:namespace=spec['destination']['namespace']
-            assert namespace not in ('argocd','traefik') or (name=='loki' and namespace=='traefik' and kind in ('Role','RoleBinding')),(name,kind,meta['name'])
+            assert namespace not in ('argocd','traefik'),(name,kind,meta['name'])
             if kind=='Secret' and name=='harbor':
                 # The chart always renders these; with every credential in harbor-credentials they hold no values.
                 assert meta['name'] in ('harbor-core','harbor-jobservice','harbor-registry','harbor-registryctl'),meta['name']

@@ -1,13 +1,14 @@
 # Minikube (`mk4`)
 
-The self-hosted cluster: Argo CD hub, Traefik, cert-manager and the monitoring stack. Every path below is from the repository root. Everything here stays on `mk4`; AWS resources belong in [`../eks`](../eks/).
+The self-hosted cluster: Argo CD hub, Traefik, and the Terraform-managed add-ons (cert-manager, Istio + Kiali, the monitoring stack). Every path below is from the repository root. Everything here stays on `mk4`; AWS resources belong in [`../eks`](../eks/).
 
 | Path | Contents | Applied by |
 |---|---|---|
 | `install.sh`, `kubeconfig.sh`, `expose-ingress.sh`, `tunnel-endpoint.sh`, `host-limits.sh`, `reset.sh` | Cluster lifecycle | Root wrappers or directly |
-| `applications/` | Argo CD catalog: AppProjects, Grafana, Prometheus, Loki, metrics-server | `./deploy-argocd.sh` |
-| `observability/` | Prometheus chart, Grafana values and dashboards, Loki and Alloy, OpenTelemetry collector, Jaeger | Argo CD, through `applications/` |
-| `argocd/`, `cert-manager/`, `traefik/`, `metrics-server/`, `namespaces/` | Controller values and manifests | `./bootstrap-cluster.sh`, Argo CD |
+| `applications/` | Argo CD catalog: AppProject `mk-platform`, opt-in Harbor | `./deploy-argocd.sh` |
+| `observability/` | Prometheus chart, Grafana values and dashboards chart, Loki and Alloy, OpenTelemetry collector, Jaeger (local Helm charts) | Terraform, [`minikube-infrastructure/`](../../minikube-infrastructure/README.md) |
+| `cert-manager/`, `metrics-server/`, `istio/` | cert-manager values and Let's Encrypt chart, metrics-server values, Istio and Kiali values | Terraform, `minikube-infrastructure/` |
+| `argocd/`, `traefik/`, `namespaces/` | Controller values and manifests | `./bootstrap-cluster.sh` |
 | `vault/`, `jfrog/`, `ecr-refresh/` | Optional components | Their own scripts and READMEs |
 | `harbor/` | Opt-in private registry ([README](harbor/README.md)) | Argo CD, `applications/optional/harbor.yaml`, by name only |
 | `examples/` | Templates. Nothing applies them. | By hand |
@@ -23,7 +24,8 @@ Docker, `kubectl` and Helm (`./init.sh --profile minikube`), AWS credentials tha
 ```bash
 ./init.sh --profile minikube
 ./deploy-minikube.sh                        # create or update the cluster
-./bootstrap-cluster.sh --context mk4        # cert-manager, Traefik, Argo CD and its ingress, ECR pull secrets
+./bootstrap-cluster.sh --context mk4        # Traefik, Argo CD and its ingress, ECR pull secrets
+terraform -chdir=minikube-infrastructure apply -var-file=vars/mk4.tfvars   # add-ons: cert-manager, Istio, Kiali, monitoring
 ./create-secrets.sh --context mk4 --apply   # missing credentials; never rotates existing ones
 ./deploy-argocd.sh --context mk4            # align and sync the catalog, without prune
 ```

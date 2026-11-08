@@ -5,8 +5,8 @@ Kubernetes manifests and tests live in roboshop-ai.git, and the shared jithendar
 in jithendar.com.git. Both are expected as sibling checkouts of tools (override with
 ROBOSHOP_AI_DIR / JITHENDAR_COM_DIR).
 
-CATALOGS holds what deploy.py manages on mk4: tools/deploy/minikube/applications (the shared platform and monitoring
-stack). The shop's Applications are in roboshop-ai/argocd-eks; they target the roboshop-demo EKS
+CATALOGS holds what deploy.py manages on mk4: tools/deploy/minikube/applications. The cluster add-ons and the
+monitoring stack are not Applications: minikube-infrastructure/ installs them with Terraform. The shop's Applications are in roboshop-ai/argocd-eks; they target the roboshop-demo EKS
 cluster, so these tools read them only to check them.
 """
 import os
@@ -17,7 +17,7 @@ TOOLS = ROOT
 APP = Path(os.environ.get('ROBOSHOP_AI_DIR', TOOLS.parent / 'roboshop-ai')).resolve()
 SITE = Path(os.environ.get('JITHENDAR_COM_DIR', TOOLS.parent / 'jithendar.com')).resolve()
 ARGOCD = APP / 'argocd-eks'                         # roboshop-ai's Argo CD Applications for EKS
-MONITORING_ARGOCD = TOOLS / 'deploy/minikube/applications'                # monitoring stack Applications (Grafana, Prometheus, Loki)
+MONITORING_ARGOCD = TOOLS / 'deploy/minikube/applications'                # mk4 catalog (AppProject mk-platform)
 CATALOGS = (MONITORING_ARGOCD,)
 # Opt-in Applications (Harbor): deployed only when named, never by "all"; validated with CATALOGS.
 OPTIONAL_ARGOCD = MONITORING_ARGOCD / 'optional'

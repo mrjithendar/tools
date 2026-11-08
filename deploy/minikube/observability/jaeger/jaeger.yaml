@@ -2,7 +2,7 @@
 # default) and was OOMKilled at the 256Mi limit (11 restarts by 2026-11-04, each one losing every trace).
 # max_traces is what bounds memory. A page view is about 15 spans (~10 kB as JSON); 5000 traces is an estimate,
 # not a measurement: alert JaegerMemoryNearLimit says when it is too many for 384Mi.
-# Kustomize turns this file into a hash-named ConfigMap, so editing it rolls Jaeger.
+# The Deployment carries this file's checksum, so editing it rolls Jaeger.
 service:
   extensions: [jaeger_storage, jaeger_query]
   pipelines:

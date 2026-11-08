@@ -1,6 +1,6 @@
 > Deployment-script cleanup: imperative application deployment commands in this
-> document are retired. Use the Argo CD catalog and the five supported commands
-> documented in `docs/operations/scripts.md`. Historical examples below are not
+> document are retired. This component is a Terraform Helm release:
+> `minikube-infrastructure/README.md`. Historical examples below are not
 > runnable deployment instructions.
 
 # cert-manager with Let's Encrypt
@@ -11,20 +11,23 @@ Run from the repository root on your Minikube host:
 bash deploy/minikube/deploy-cert-manager.sh
 ```
 
-The script requires a running Minikube cluster, `kubectl`, and Helm. If Helm is missing, install it using the [official Helm installation instructions](https://helm.sh/docs/intro/install/). It installs the pinned official cert-manager chart (`v1.20.4`) with CRDs, waits for readiness, and installs a small local Helm chart containing two ClusterIssuers:
+The script requires a running Minikube cluster, `kubectl`, and Helm. If Helm is missing, install it using the [official Helm installation instructions](https://helm.sh/docs/intro/install/). Today Terraform installs the pinned official cert-manager chart (`v1.20.4`) with CRDs (`minikube-infrastructure/cert-manager.tf`) and the local chart `issuers/` as release `letsencrypt-jithendar` (`letsencrypt.tf`):
 
-| Issuer | Purpose |
+| Object | Purpose |
 | --- | --- |
-| `letsencrypt-staging` | Test issuance; browsers do not trust its certificates. |
-| `letsencrypt-prod` | Trusted website certificates and automatic renewal. |
+| ClusterIssuer `letsencrypt-dns` | DNS-01 through Cloudflare for `jithendar.com` and `*.jithendar.com`; Secret `cert-manager/cloudflare-api-token` first. |
+| ClusterIssuer `letsencrypt-dns-staging` | Same, Let's Encrypt staging; browsers do not trust its certificates. |
+| Certificate `jithendar/jithendar-com-wildcard` | `jithendar.com` + `*.jithendar.com`, Secret `jithendar-com-wildcard-tls`. |
+
+`letsencrypt-prod` and `letsencrypt-staging` (HTTP-01 through Traefik) are not in this chart: the jithendar.com repository owns them (`minikube/45-jithendar-letsencrypt.yaml`).
 
 It follows the installer's selected `mk4` profile. Use `PROFILE=another-base-profile` if needed. From a laptop with a remote kubeconfig, explicitly set `KUBE_CONTEXT` to the context in that file. Every command targets that context; the script does not silently use an unrelated current cluster.
 
 ## Configuration
 
 - `values.yaml`: official cert-manager Helm values and resources.
-- `issuers/values.yaml`: ACME email, ingress class, endpoints and account Secret names.
-- `issuers/templates/letsencrypt-staging-cluster-issuer.yaml` and `letsencrypt-production-cluster-issuer.yaml`: one issuer per template.
+- `issuers/values.yaml`: ACME email, Cloudflare Secret, DNS zone, endpoints, account Secret names and the wildcard Certificate.
+- `issuers/templates/letsencrypt-staging-cluster-issuer.yaml`, `letsencrypt-production-cluster-issuer.yaml` and `wildcard-certificate.yaml`: one object per template.
 - `../examples/certificate.example.yaml`: optional certificate request for `jithendar.com`.
 
 The default account email is `jithendardharmapuri@gmail.com` and the ingress class is `traefik`. Override without editing YAML:

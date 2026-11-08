@@ -2,7 +2,8 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   annotations:
-    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+    # terraform destroy and helm uninstall leave the volume and its data.
+    helm.sh/resource-policy: keep
   name: alloy-data
   namespace: monitoring
 spec:

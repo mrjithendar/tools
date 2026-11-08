@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 import unittest
 import yaml
 ROOT=Path(__file__).resolve().parents[1]
@@ -11,9 +12,11 @@ class Config(unittest.TestCase):
   data=yaml.safe_load((APP/'argocd-eks/apps/roboshop/roboshop-config-configmap.yaml').read_text())['data']
   self.assertNotIn('config.yaml',data)
   self.assertEqual(data['OTEL_EXPORTER_OTLP_TRACES_ENDPOINT'],'http://otel-collector.observability.svc.cluster.local:4318/v1/traces')
-  kustomization=yaml.safe_load((ROOT/'deploy/minikube/observability/otel-collector/kustomization.yaml').read_text())
-  self.assertEqual(kustomization['configMapGenerator'][0]['files'],['config.yaml=collector.yaml'])
-  alias=yaml.safe_load((ROOT/'deploy/minikube/observability/otel-collector/roboshop-ai-otel-collector-service-minikube.yaml').read_text())
+  chart=ROOT/'deploy/minikube/observability/otel-collector'
+  docs=[d for d in yaml.safe_load_all(subprocess.check_output(['helm','template','otel-collector',str(chart),'-n','observability'],text=True)) if d]
+  config=next(d for d in docs if d['kind']=='ConfigMap' and d['metadata']['name']=='otel-collector-config')
+  self.assertEqual(config['data'],{'config.yaml':(chart/'collector.yaml').read_text()})
+  alias=yaml.safe_load((chart/'templates/roboshop-ai-otel-collector-service-minikube.yaml').read_text())
   self.assertEqual((alias['metadata']['namespace'],alias['spec']['type']),('roboshop-ai','ExternalName'))
  def test_new_exporters_receive_shared_configuration(self):
   for service in ('currency-service','kafka-bridge'):

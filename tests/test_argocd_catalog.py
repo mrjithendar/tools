@@ -7,6 +7,9 @@ import sys
 sys.path.insert(0, str(ROOT / 'scripts/lib'))
 from repos import APP_REPO, ARGOCD, TOOLS, checkout  # noqa: E402
 APP = checkout(APP_REPO)  # roboshop-ai: microservices and their manifests
+# Helm releases in minikube-infrastructure/ that used to be Argo CD Applications, and the namespaces they own.
+ADDONS=('metrics-server','cert-manager','grafana','prometheus','loki','otel-collector','jaeger')
+TERRAFORM_NAMESPACES={'kube-system','cert-manager','istio-system','monitoring','observability'}
 spec=importlib.util.spec_from_file_location('catalog_validate',ROOT/'scripts/argocd/validate.py')
 module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 
@@ -14,13 +17,12 @@ module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 def test_catalog_has_unique_safe_ownership():
     apps,owners=module.validate()
     names={app['metadata']['name'] for app in apps}
-    assert {'grafana','loki'} <= names
     assert not {'moks','catalogue-service','web'} & names
     assert not {'shopping-agent','product-ingestion','jfrog'} & names
     assert not {'argocd','traefik','coredns','kube-proxy','kindnet'}&names
-    # tools/deploy/minikube/applications (6) and its opt-in harbor; RoboShop is on EKS (roboshop-ai/argocd-eks)
-    assert len(apps)==7 and 'harbor' in names
-    assert 'cert-manager' not in names
+    # tools/deploy/minikube/applications holds only the opt-in harbor; the add-ons are Terraform releases
+    # (minikube-infrastructure/) and RoboShop is on EKS (roboshop-ai/argocd-eks).
+    assert names=={'harbor'}
     assert not any(ns=='roboshop-ai' and kind in ('Deployment','StatefulSet') for _,kind,ns,_ in owners)
 
 
@@ -88,7 +90,8 @@ def test_inventory_excludes_cluster_managed_networking():
     inventory=[row for directory in CATALOGS for row in json.loads((directory/'workload-inventory.json').read_text())]
     assert not any(namespace=='kube-system' and name in {'coredns','kindnet','kube-proxy'}
                    for kind,namespace,name in inventory)
-    assert ['Deployment','kube-system','metrics-server'] in inventory
+    # metrics-server and the observability stack are Terraform releases, not Argo CD workloads.
+    assert not any(namespace in TERRAFORM_NAMESPACES for kind,namespace,name in inventory)
 
 
 def test_required_inventory_matches_active_catalog_and_rejects_missing_workloads():
@@ -97,7 +100,6 @@ def test_required_inventory_matches_active_catalog_and_rejects_missing_workloads
     from repos import CATALOGS
     expected={tuple(row) for directory in CATALOGS for row in json.loads((directory/'workload-inventory.json').read_text())}
     assert not any(name in ('product-ingestion','shopping-agent') for _,ns,name in expected)
-    assert ('Deployment','monitoring','grafana') in expected
     assert not any(ns=='roboshop-ai' for _,ns,_ in expected)
     module.validate_inventory(expected)
     # Every remaining entry stays mandatory, including chart-generated workloads.
@@ -106,8 +108,13 @@ def test_required_inventory_matches_active_catalog_and_rejects_missing_workloads
             module.validate_inventory(expected-{workload})
 
 
-def test_external_validation_calls_required_inventory(monkeypatch):
-    # Mock Helm rendering, not the coverage assertion. Missing chart workloads must fail.
+def test_external_validation_calls_required_inventory(monkeypatch,tmp_path):
+    # Mock Helm rendering, not the coverage assertion. A required workload no Application renders must fail.
+    import json,shutil
+    shutil.copy(TOOLS/'deploy/minikube/applications/project-mk-platform.yaml',tmp_path)
+    (tmp_path/'kustomization.yaml').write_text('resources:\n- project-mk-platform.yaml\n')
+    (tmp_path/'workload-inventory.json').write_text(json.dumps([['Deployment','jithendar','missing']]))
+    monkeypatch.setattr(module,'CATALOGS',(tmp_path,))
     original=module.render
     monkeypatch.setattr(module,'render',lambda app,external=False: original(app,False))
     import pytest
@@ -140,28 +147,22 @@ def test_retired_ingestion_has_no_deployable_or_runtime_references():
             assert 'INGESTION_URL' not in text,path
 
 
-def test_monitoring_stack_lives_in_tools_catalog():
-    import json
-    from repos import CATALOGS, MONITORING_ARGOCD
-    assert MONITORING_ARGOCD in CATALOGS and ARGOCD not in CATALOGS
+def test_addons_are_terraform_releases_not_applications():
+    import re
+    from repos import MONITORING_ARGOCD
     tools=yaml.safe_load((MONITORING_ARGOCD/'kustomization.yaml').read_text())['resources']
     shop=yaml.safe_load((ARGOCD/'kustomization.yaml').read_text())['resources']
-    moved={'grafana.yaml','prometheus.yaml','loki.yaml','otel-collector.yaml','jaeger.yaml','project-observability.yaml'}
-    assert moved <= set(tools)
-    assert not moved & set(shop)
-    assert not any((ARGOCD/name).exists() for name in moved)
-    # Their workloads are required by the tools inventory, not roboshop-ai's.
-    monitoring={tuple(r) for r in json.loads((MONITORING_ARGOCD/'workload-inventory.json').read_text())}
-    assert {('Deployment','monitoring',n) for n in ('alloy','grafana','loki','prometheus')} <= monitoring
-    # Every monitoring app reads its sources from tools.git (or a pinned chart repository). The one exception:
-    # grafana reads the jithendar.com dashboards from that repo's grafana/ folder.
-    for doc in module.catalog():
-        if doc['kind']=='Application' and doc['metadata']['name'] in ('grafana','prometheus','loki'):
-            for source in doc['spec'].get('sources',[doc['spec'].get('source')]):
-                if source['repoURL']=='https://github.com/mrjithendar/jithendar.com.git':
-                    assert doc['metadata']['name']=='grafana' and source.get('path')=='grafana',source
-                    continue
-                assert source['repoURL'].startswith(('https://github.com/mrjithendar/tools.git','https://grafana-community.github.io/')),source
+    assert tools==['project-mk-platform.yaml']
+    for name in ADDONS:
+        assert not (MONITORING_ARGOCD/f'{name}.yaml').exists(),name
+        assert f'{name}.yaml' not in shop,name
+    assert not (MONITORING_ARGOCD/'project-observability.yaml').exists()
+    releases=set(re.findall(r'^resource "helm_release" "\w+" \{\n\s+name\s+= "([\w-]+)"',
+        ''.join(p.read_text() for p in (TOOLS/'minikube-infrastructure').glob('*.tf')),re.M))
+    assert set(ADDONS)|{'istio-base','istiod','kiali','letsencrypt-jithendar','grafana-dashboards'}<=releases
+    # Argo CD may no longer deploy into the namespaces Terraform owns.
+    project=yaml.safe_load((MONITORING_ARGOCD/'project-mk-platform.yaml').read_text())['spec']
+    assert not {d['namespace'] for d in project['destinations']}&TERRAFORM_NAMESPACES
 
 
 def test_deploy_catalog_holds_only_mk4_apps():
@@ -169,6 +170,5 @@ def test_deploy_catalog_holds_only_mk4_apps():
     spec=util.spec_from_file_location('catalog_deploy',ROOT/'scripts/argocd/deploy.py')
     deploy=util.module_from_spec(spec);spec.loader.exec_module(deploy)
     apps,projects=deploy.catalog()
-    assert {'grafana','prometheus','loki'} <= set(apps)
-    assert not {'web','moks'} & set(apps)
-    assert {'mk-platform','mk-observability'} <= set(projects)
+    assert apps=={}
+    assert set(projects)=={'mk-platform'}

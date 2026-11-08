@@ -1,27 +1,20 @@
-# Argo CD catalog: observability stack
+# Argo CD catalog for mk4
 
-Applications for the shared observability stack, whose sources live in this repository under `observability/`.
-All five are in the AppProject `mk-observability` (`project-observability.yaml`); `metrics-server` stays in `mk-platform`.
-`deploy.py` creates a missing project and moves an existing Application to the project Git names, but it does not
-update an AppProject that already exists: `kubectl --context mk4 apply -f deploy/minikube/applications/project-observability.yaml`.
+`kustomization.yaml` lists only the AppProject `mk-platform`, so `./deploy-argocd.sh` (`all`) has nothing to sync on
+mk4 by default. The cluster add-ons that used to be Applications here (metrics-server, cert-manager, Grafana,
+Prometheus, Loki + Alloy, OpenTelemetry Collector, Jaeger), and Istio and Kiali, are Terraform Helm releases:
+[`minikube-infrastructure/`](../../../minikube-infrastructure/README.md). `workload-inventory.json` is empty for the
+same reason. `mk-platform` no longer allows the namespaces Terraform owns (`kube-system`, `cert-manager`,
+`istio-system`, `monitoring`, `observability`).
 
-| Application | Project | Source | Namespace |
-|---|---|---|---|
-| `grafana` | `mk-observability` | grafana-community chart 14.0.1 + `deploy/minikube/observability/grafana/values.yaml` + `deploy/minikube/observability/grafana/dashboards` | `monitoring` |
-| `prometheus` | `mk-observability` | `deploy/minikube/observability/prometheus` (local chart) | `monitoring` |
-| `loki` (Loki + Alloy) | `mk-observability` | `deploy/minikube/observability/loki` | `monitoring` |
-| `otel-collector` | `mk-observability` | `deploy/minikube/observability/otel-collector` (Kustomize; also the `roboshop-ai/otel-collector` ExternalName Service) | `observability` |
-| `jaeger` | `mk-observability` | `deploy/minikube/observability/jaeger` (Kustomize) | `observability` |
+`deploy.py` does not update an AppProject that already exists:
+`kubectl --context mk4 apply -f deploy/minikube/applications/project-mk-platform.yaml`.
 
 RoboShop runs on EKS: its Applications are in `roboshop-ai/argocd-eks`. `scripts/argocd/deploy.py`
-and `validate.py` read both catalogs together (`scripts/lib/repos.py`: `CATALOGS`), so ownership, project and
-workload-inventory checks still cover the whole cluster; a name defined in both catalogs is an error.
-`workload-inventory.json` lists the workloads these apps must render.
-
-Applications are created or aligned from Git and synced without prune:
+and `validate.py` read both catalogs together (`scripts/lib/repos.py`: `CATALOGS`); a name defined in both catalogs
+is an error.
 
 ```bash
-python3 scripts/argocd/deploy.py grafana prometheus loki otel-collector jaeger --context mk4   # aligns live specs with Git, then syncs
 python3 scripts/argocd/validate.py --external-charts                     # also run by roboshop-ai's CI daily
 ```
 

@@ -11,7 +11,8 @@ persistence:
   size: 2Gi
   accessModes: [ReadWriteOnce]
   annotations:
-    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+    # terraform destroy and helm uninstall leave the volume and its data.
+    helm.sh/resource-policy: keep
 resources:
   requests:
     cpu: 100m
@@ -122,8 +123,8 @@ datasources:
             customQuery: true
             query: '{namespace=~"jithendar|moks"} |= "trace_id=$${__trace.traceId}"'
 
-# RoboShop dashboards live in deploy/minikube/observability/grafana/dashboards and arrive as the
-# grafana-dashboards-roboshop ConfigMap (third source of the grafana Application).
+# The ConfigMaps come from the grafana-dashboards release (minikube-infrastructure/grafana.tf): RoboShop and MOKS
+# from ./dashboards, Jithendar.com from the jithendar.com checkout's grafana/ folder.
 dashboardProviders:
   dashboardproviders.yaml:
     apiVersion: 1

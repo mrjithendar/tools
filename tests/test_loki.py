@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[1]
 
 class LokiTests(unittest.TestCase):
     def test_render_and_boundaries(self):
-        docs=list(yaml.safe_load_all(subprocess.check_output(['kubectl','kustomize',str(ROOT/'deploy/minikube/observability/loki')],text=True)))
+        docs=[d for d in yaml.safe_load_all(subprocess.check_output(['helm','template','loki',str(ROOT/'deploy/minikube/observability/loki'),'-n','monitoring'],text=True)) if d]
         deployments=[d for d in docs if d['kind']=='Deployment']
         self.assertEqual({d['metadata']['name'] for d in deployments},{'loki','alloy'})
         self.assertFalse(any(d['kind'] in ('IngressRoute','Role','RoleBinding','Secret') for d in docs))
@@ -24,7 +24,7 @@ class LokiTests(unittest.TestCase):
         self.assertEqual(binding['subjects'],[{'kind':'ServiceAccount','name':'alloy','namespace':'monitoring'}])
 
     def test_public_route_is_authenticated_and_read_only(self):
-        docs=list(yaml.safe_load_all(subprocess.check_output(['kubectl','kustomize',str(ROOT/'deploy/minikube/observability/loki')],text=True)))
+        docs=[d for d in yaml.safe_load_all(subprocess.check_output(['helm','template','loki',str(ROOT/'deploy/minikube/observability/loki'),'-n','monitoring'],text=True)) if d]
         ingress=next(d for d in docs if d['kind']=='Ingress' and d['metadata']['name']=='loki-read')
         self.assertEqual({d['metadata']['name'] for d in docs if d['kind']=='Ingress'},{'loki-read','loki-push'})
         self.assertEqual(ingress['metadata']['annotations']['traefik.ingress.kubernetes.io/router.middlewares'],'monitoring-loki-read-auth@kubernetescrd')
@@ -33,18 +33,25 @@ class LokiTests(unittest.TestCase):
         middleware=next(d for d in docs if d['kind']=='Middleware' and d['metadata']['name']=='loki-read-auth')
         self.assertEqual(middleware['spec']['basicAuth']['secret'],'loki-read-auth')
         self.assertNotEqual(middleware['spec']['basicAuth']['secret'],'monitoring-auth')
-        project=yaml.safe_load((ROOT/'deploy/minikube/applications/project-observability.yaml').read_text())
-        allowed={(r['group'],r['kind']) for r in project['spec']['namespaceResourceWhitelist']}
-        self.assertLessEqual({('networking.k8s.io','Ingress'),('traefik.io','Middleware')},allowed)
 
     def test_push_route_is_authenticated_and_push_only(self):
-        docs=list(yaml.safe_load_all(subprocess.check_output(['kubectl','kustomize',str(ROOT/'deploy/minikube/observability/loki')],text=True)))
+        docs=[d for d in yaml.safe_load_all(subprocess.check_output(['helm','template','loki',str(ROOT/'deploy/minikube/observability/loki'),'-n','monitoring'],text=True)) if d]
         ingress=next(d for d in docs if d['kind']=='Ingress' and d['metadata']['name']=='loki-push')
         self.assertEqual(ingress['metadata']['annotations']['traefik.ingress.kubernetes.io/router.middlewares'],'monitoring-loki-push-auth@kubernetescrd')
         paths={p['path']:p['pathType'] for r in ingress['spec']['rules'] for p in r['http']['paths']}
         self.assertEqual(paths,{'/loki/api/v1/push':'Exact'})
         middleware=next(d for d in docs if d['kind']=='Middleware' and d['metadata']['name']=='loki-push-auth')
         self.assertEqual(middleware['spec']['basicAuth']['secret'],'loki-push-auth')
+
+    def test_config_files_reach_configmaps_verbatim(self):
+        docs=[d for d in yaml.safe_load_all(subprocess.check_output(['helm','template','loki',str(ROOT/'deploy/minikube/observability/loki'),'-n','monitoring'],text=True)) if d]
+        maps={d['metadata']['name']:d['data'] for d in docs if d['kind']=='ConfigMap'}
+        base=ROOT/'deploy/minikube/observability/loki'
+        self.assertEqual(maps['loki-config']['loki.yaml'],(base/'loki.yaml').read_text())
+        self.assertEqual(maps['alloy-config']['config.alloy'],(base/'config.alloy').read_text())
+        # The PVCs outlive helm uninstall and terraform destroy.
+        for claim in (d for d in docs if d['kind']=='PersistentVolumeClaim'):
+            self.assertEqual(claim['metadata']['annotations']['helm.sh/resource-policy'],'keep')
 
     def test_eks_alloy_differs_from_mk4_only_in_destination(self):
         mk4=(ROOT/'deploy/minikube/observability/loki/config.alloy').read_text()

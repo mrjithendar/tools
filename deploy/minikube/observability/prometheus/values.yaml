@@ -9,6 +9,9 @@ retentionSize: 4GB
 # Discover nodes and collect kubelet/container metrics through the authenticated API proxy.
 kubernetesMetrics:
   enabled: true
+# Scrape istiod and the Istio sidecars for Kiali; adds pod list/watch to the ClusterRole (needs kubernetesMetrics).
+istioMetrics:
+  enabled: true
 # Accept metrics pushed from clusters this Prometheus cannot reach. The Secret is created by hand: see README.
 remoteWrite:
   enabled: true

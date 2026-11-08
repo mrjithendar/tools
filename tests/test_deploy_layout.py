@@ -218,8 +218,21 @@ def test_old_top_level_directories_are_gone():
         assert not (ROOT / name).exists(), name
 
 
-def test_minikube_issuer_chart_keeps_http01():
-    output = subprocess.check_output(['helm', 'template', 'issuers', str(MINIKUBE / 'cert-manager/issuers')], text=True)
-    issuers = [d for d in yaml.safe_load_all(output) if d]
-    assert {i['metadata']['name'] for i in issuers} == {'letsencrypt-prod', 'letsencrypt-staging'}
-    assert all('http01' in i['spec']['acme']['solvers'][0] for i in issuers)
+def test_minikube_issuers_solve_dns01_for_the_wildcard():
+    output = subprocess.check_output(['helm', 'template', 'letsencrypt-jithendar', str(MINIKUBE / 'cert-manager/issuers'),
+                                      '-n', 'cert-manager'], text=True)
+    docs = [d for d in yaml.safe_load_all(output) if d]
+    issuers = {d['metadata']['name']: d for d in docs if d['kind'] == 'ClusterIssuer'}
+    # letsencrypt-prod/-staging (HTTP-01) belong to the jithendar.com repository; these must not collide.
+    assert set(issuers) == {'letsencrypt-dns', 'letsencrypt-dns-staging'}
+    example = documents_example('cloudflare-api-token-secret')
+    # ClusterIssuers read their Secrets from cert-manager's own namespace.
+    assert example['metadata']['namespace'] == 'cert-manager'
+    for issuer in issuers.values():
+        solver = issuer['spec']['acme']['solvers'][0]
+        assert 'http01' not in solver and solver['selector']['dnsZones'] == ['jithendar.com']
+        reference = solver['dns01']['cloudflare']['apiTokenSecretRef']
+        assert reference == {'name': example['metadata']['name'], 'key': 'api-token'}
+    certificate = next(d for d in docs if d['kind'] == 'Certificate')
+    assert certificate['spec']['dnsNames'] == ['jithendar.com', '*.jithendar.com']
+    assert certificate['spec']['issuerRef']['name'] == 'letsencrypt-dns'

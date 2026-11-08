@@ -13,7 +13,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/lib'))
-from repos import CATALOGS, MONITORING_ARGOCD, OPTIONAL_ARGOCD  # noqa: E402
+from repos import CATALOGS, OPTIONAL_ARGOCD  # noqa: E402
 ARGOCD_CHART_VERSION = '10.10.5'
 
 
@@ -66,7 +66,7 @@ def source_drift(live, desired):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, epilog=
-        'Examples: ./deploy-argocd.sh grafana | '
+        'Examples: ./deploy-argocd.sh harbor | '
         './deploy-argocd.sh status. Requires kubectl and Python with PyYAML. '
         'Apps deploy their configured Git revision; commit/push workload changes first.')
     parser.add_argument('apps', nargs='*', default=['all'],
@@ -76,10 +76,6 @@ def main():
     parser.add_argument('--timeout', type=int, default=600, help='Seconds to wait for Synced/Healthy (default 600)')
     args = parser.parse_args()
     apps, projects = catalog()
-    # Legacy explicit selection supports repairing an existing Argo-managed
-    # cert-manager. It is never included by 'all' on a fresh Helm bootstrap.
-    if 'cert-manager' in args.apps:
-        apps['cert-manager'] = yaml.safe_load((MONITORING_ARGOCD / 'cert-manager.yaml').read_text())
     optional_apps, optional_projects = optional_catalog()
     for name in set(args.apps) & optional_apps.keys():
         apps[name] = optional_apps[name]

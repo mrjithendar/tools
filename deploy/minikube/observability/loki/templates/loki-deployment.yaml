@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: alloy
+  name: loki
   namespace: monitoring
 spec:
   replicas: 1
@@ -9,39 +9,39 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: alloy
+      app: loki
   template:
     metadata:
+      annotations:
+        # Rolls the pod when loki.yaml changes.
+        checksum/config: {{ .Files.Get "loki.yaml" | sha256sum }}
       labels:
-        app: alloy
+        app: loki
     spec:
       # Minikube hostPath data lives on this node; move only together with the data.
       nodeSelector:
-        kubernetes.io/hostname: mk4-m03
+        kubernetes.io/hostname: mk4-m02
       securityContext:
-        runAsUser: 473
-        runAsGroup: 473
+        runAsUser: 10001
+        runAsGroup: 10001
         runAsNonRoot: true
-        fsGroup: 473
-      automountServiceAccountToken: true
+        fsGroup: 10001
+      automountServiceAccountToken: false
       containers:
-      - name: alloy
-        image: grafana/alloy:v1.21.2
+      - name: loki
+        image: grafana/loki:3.7.9
         args:
-        - run
-        - --server.http.listen-addr=0.0.0.0:12345
-        - --storage.path=/var/alloy
-        - /etc/alloy/config.alloy
+        - -config.file=/etc/loki/loki.yaml
         ports:
         - name: http
-          containerPort: 12345
+          containerPort: 3100
         resources:
           requests:
             cpu: 100m
-            memory: 128Mi
+            memory: 256Mi
           limits:
-            cpu: 500m
-            memory: 384Mi
+            cpu: '1'
+            memory: 1Gi
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -50,34 +50,33 @@ spec:
             - ALL
         volumeMounts:
         - name: config
-          mountPath: /etc/alloy
+          mountPath: /etc/loki
           readOnly: true
         - name: data
-          mountPath: /var/alloy
+          mountPath: /var/loki
         - name: tmp
           mountPath: /tmp
         readinessProbe:
           httpGet:
-            path: /-/ready
+            path: /ready
             port: http
           periodSeconds: 5
       volumes:
       - name: config
         configMap:
-          name: alloy-config
+          name: loki-config
       - name: data
         persistentVolumeClaim:
-          claimName: alloy-data
+          claimName: loki-data
       - name: tmp
         emptyDir: {}
-      serviceAccountName: alloy
       initContainers:
       - name: data-permissions
         image: busybox:1.37.0
         command:
         - sh
         - -ec
-        - chown -R 473:473 /data
+        - chown -R 10001:10001 /data
         securityContext:
           runAsUser: 0
           runAsNonRoot: false

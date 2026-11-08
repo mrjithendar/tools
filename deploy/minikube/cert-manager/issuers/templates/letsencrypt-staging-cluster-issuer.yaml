@@ -1,16 +1,20 @@
-{{- if .Values.issuers.staging }}
+{{- with .Values.issuers.staging }}
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
-  name: {{ .Values.issuers.staging.name | quote }}
+  name: {{ .name | quote }}
 spec:
   acme:
-    email: {{ required "Set an ACME email" .Values.email | quote }}
-    server: {{ .Values.issuers.staging.server | quote }}
+    email: {{ required "Set an ACME email" $.Values.email | quote }}
+    server: {{ .server | quote }}
     privateKeySecretRef:
-      name: {{ .Values.issuers.staging.accountSecret | quote }}
+      name: {{ .accountSecret | quote }}
     solvers:
-      - http01:
-          ingress:
-            ingressClassName: {{ required "Set ingressClassName" .Values.ingressClassName | quote }}
+      - selector:
+          dnsZones: {{ toYaml $.Values.dnsZones | nindent 12 }}
+        dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: {{ $.Values.cloudflare.secretName | quote }}
+              key: {{ $.Values.cloudflare.secretKey | quote }}
 {{- end }}
