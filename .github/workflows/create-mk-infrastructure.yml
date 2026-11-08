@@ -1,4 +1,4 @@
-name: Deploy minikube infrastructure
+name: Create minikube infrastructure
 
 # Applies minikube-infrastructure/ (Helm releases on mk4: metrics-server, cert-manager, Let's Encrypt, Istio, Kiali,
 # Prometheus, Grafana, Loki, OpenTelemetry Collector, Jaeger) on pushes to master, or by hand with "plan only" to see
@@ -77,6 +77,21 @@ jobs:
         with:
           terraform_version: 1.16.6
           terraform_wrapper: false
+
+      # Without the role ARN, configure-aws-credentials falls back to static keys and retries 12 times with
+      # "Could not load credentials from any providers".
+      - name: Check CI settings
+        env:
+          MK4_TERRAFORM_ROLE_ARN: ${{ vars.MK4_TERRAFORM_ROLE_ARN }}
+          MK4_API_SERVER: ${{ vars.MK4_API_SERVER }}
+          MK4_CA_DATA: ${{ vars.MK4_CA_DATA }}
+          MK4_TERRAFORM_TOKEN: ${{ secrets.MK4_TERRAFORM_TOKEN }}
+        run: |
+          missing=()
+          for v in MK4_TERRAFORM_ROLE_ARN MK4_API_SERVER MK4_CA_DATA MK4_TERRAFORM_TOKEN; do
+            [[ -n "${!v}" ]] || missing+=("$v")
+          done
+          [[ ${#missing[@]} -eq 0 ]] || { echo "::error::Not set: ${missing[*]}. Run scripts/setup-minikube-terraform-ci.sh"; exit 1; }
 
       - name: AWS credentials (state only)
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
