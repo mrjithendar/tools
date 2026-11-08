@@ -1,4 +1,4 @@
-name: Check infrastructure
+name: Check AWS infrastructure
 
 # Runs on GitHub-hosted runners with no AWS access: this repository is public, so pull request code must
 # never reach the self-hosted runner that applies Terraform.
