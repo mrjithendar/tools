@@ -1,6 +1,8 @@
-environment        = "demo"
-userid             = "JDHARMAPURI"
-aws_region         = "us-east-1"
+environment = "demo"
+userid      = "JDHARMAPURI"
+aws_region  = "us-east-1"
+# False destroys the VPC, subnets, NAT gateways and routes (EKS must be off first).
+vpc_enabled        = true
 vpc_cidr           = "10.0.0.0/16"
 availability_zones = ["us-east-1a", "us-east-1b"]
 # False = one NAT per AZ. True reduces demo costs but makes egress depend on one AZ.
@@ -11,7 +13,8 @@ ses_domain  = "jithendar.com"
 
 ecr_pull_principals = {}
 
-eks_enabled = true
+eks_enabled = false
+
 # t4g.medium stops at 17 Pods per node; the add-ons here need more. Changing this replaces the node group.
 eks_node_instance_types = ["t4g.large"]
 # The role is created by eks-roles.tf. Root is listed for the EKS console while the account has no IAM users.

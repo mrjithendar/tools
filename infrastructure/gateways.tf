@@ -1,5 +1,6 @@
 resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.vpc.id
+  count  = var.vpc_enabled ? 1 : 0
+  vpc_id = aws_vpc.vpc[0].id
   tags   = merge(local.common_tags, { Name = "${local.name_prefix}-igw-${var.environment}" })
 }
 
@@ -16,4 +17,9 @@ resource "aws_nat_gateway" "ngw" {
   subnet_id         = local.publicSubnets[count.index]
   tags              = merge(local.common_tags, { Name = "${local.name_prefix}-nat-${count.index + 1}-${var.environment}" })
   depends_on        = [aws_internet_gateway.igw]
+}
+
+moved {
+  from = aws_internet_gateway.igw
+  to   = aws_internet_gateway.igw[0]
 }

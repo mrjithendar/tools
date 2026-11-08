@@ -22,6 +22,10 @@ network. Two or three explicitly ordered AZs are supported.
 | Private | 10.0.0.0/20, 10.0.16.0/20 | EKS nodes, pod addresses and control-plane ENIs |
 | Public | 10.0.240.0/24, 10.0.241.0/24 | Internet-facing load balancers and NAT gateways |
 
+`vpc_enabled` (default `true`) switches the whole network: VPC, subnets, internet and NAT gateways, route tables
+and the S3 endpoint. `false` destroys them, and EKS then cannot be enabled (`eks_enabled` requires `vpc_enabled`).
+Network outputs are `null` or empty while it is off.
+
 Public subnets route to an Internet Gateway. Private subnets use a NAT in the same
 AZ by default. `single_nat_gateway = true` reduces demo NAT costs but makes egress
 depend on the first AZ and may incur cross-AZ traffic charges. Both subnet types

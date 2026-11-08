@@ -1,9 +1,9 @@
 output "vpc_cidr" {
-  value = aws_vpc.vpc.cidr_block
+  value = one(aws_vpc.vpc[*].cidr_block)
 }
 
 output "vpc_id" {
-  value = aws_vpc.vpc.id
+  value = one(aws_vpc.vpc[*].id)
 }
 
 output "private_subnets" {
@@ -19,7 +19,7 @@ output "subnets" {
 }
 
 output "public_rt" {
-  value = aws_route_table.pl_rt.id
+  value = one(aws_route_table.pl_rt[*].id)
 }
 
 output "private_rt" {

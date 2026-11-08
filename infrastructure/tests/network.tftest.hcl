@@ -69,3 +69,31 @@ run "reject_small_vpc" {
   }
   expect_failures = [var.vpc_cidr]
 }
+
+run "vpc_disabled" {
+  command = plan
+  variables {
+    vpc_enabled = false
+  }
+  assert {
+    condition = (
+      length(aws_vpc.vpc) == 0 && length(aws_subnet.vpc_private_subnets) == 0 && length(aws_subnet.vpc_public_subnets) == 0 &&
+      length(aws_internet_gateway.igw) == 0 && length(aws_nat_gateway.ngw) == 0 && length(aws_eip.eip) == 0 &&
+      length(aws_route_table.pl_rt) == 0 && length(aws_route_table.pr_rt) == 0 && length(aws_vpc_endpoint.s3) == 0
+    )
+    error_message = "vpc_enabled = false must create no network resources."
+  }
+  assert {
+    condition     = output.vpc_id == null && output.public_rt == null && length(output.private_subnets) == 0
+    error_message = "Network outputs must be empty without the VPC."
+  }
+}
+
+run "eks_requires_vpc" {
+  command = plan
+  variables {
+    vpc_enabled = false
+    eks_enabled = true
+  }
+  expect_failures = [var.eks_enabled]
+}

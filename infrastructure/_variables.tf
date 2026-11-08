@@ -17,6 +17,12 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
+variable "vpc_enabled" {
+  description = "Create the VPC with its subnets, internet and NAT gateways, route tables and S3 endpoint. Required by EKS. Turning it off destroys them."
+  type        = bool
+  default     = true
+}
+
 variable "vpc_cidr" {
   description = "IPv4 /16 network, checked against existing networks before peering."
   type        = string
@@ -163,6 +169,10 @@ variable "eks_node_count" {
 variable "eks_enabled" {
   type    = bool
   default = false
+  validation {
+    condition     = !var.eks_enabled || var.vpc_enabled
+    error_message = "EKS runs in this VPC's private subnets: set vpc_enabled = true to enable EKS."
+  }
 }
 
 variable "eks_version" {
