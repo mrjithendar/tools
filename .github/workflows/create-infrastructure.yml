@@ -2,13 +2,13 @@ name: Create infrastructure
 
 on:
   workflow_dispatch:
-  push:
-    # Apply from master only: a filter here is what keeps Dependabot and other branches from applying
-    # unreviewed Terraform. Pull requests are checked by check-infrastructure.yml.
-    branches: [master]
-    paths:
-      - 'infrastructure/**'
-      - '.github/workflows/create-infrastructure.yml'
+  # push:
+  #   # Apply from master only: a filter here is what keeps Dependabot and other branches from applying
+  #   # unreviewed Terraform. Pull requests are checked by check-infrastructure.yml.
+  #   branches: [master]
+  #   paths:
+  #     - 'infrastructure/**'
+  #     - '.github/workflows/create-infrastructure.yml'
 
 permissions:
   contents: read

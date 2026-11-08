@@ -14,21 +14,21 @@ name: Deploy minikube infrastructure
 # Runs on GitHub-hosted runners, never on the mk4 server (runner/README.md).
 on:
   workflow_dispatch:
-    inputs:
-      plan_only:
-        description: Plan without applying
-        type: boolean
-        default: false
-  push:
-    branches: [master]
-    paths:
-      - 'minikube-infrastructure/**'
-      - 'deploy/minikube/cert-manager/**'
-      - 'deploy/minikube/metrics-server/values.yaml'
-      - 'deploy/minikube/istio/**'
-      - 'deploy/minikube/observability/**'
-      - '.github/mk4-terraform-kubeconfig.yaml'
-      - '.github/workflows/minikube-terraform-apply.yml'
+  #   inputs:
+  #     plan_only:
+  #       description: Plan without applying
+  #       type: boolean
+  #       default: false
+  # push:
+  #   branches: [master]
+  #   paths:
+  #     - 'minikube-infrastructure/**'
+  #     - 'deploy/minikube/cert-manager/**'
+  #     - 'deploy/minikube/metrics-server/values.yaml'
+  #     - 'deploy/minikube/istio/**'
+  #     - 'deploy/minikube/observability/**'
+  #     - '.github/mk4-terraform-kubeconfig.yaml'
+  #     - '.github/workflows/minikube-terraform-apply.yml'
 
 permissions:
   contents: read
