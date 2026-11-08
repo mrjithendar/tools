@@ -1,14 +1,12 @@
-"""deploy/eks and deploy/minikube stay separate, and deploy/eks is complete, plain YAML."""
+"""deploy/eks is complete, plain YAML and reads nothing from Minikube (now in the miniKube repository)."""
 from pathlib import Path
 import re
-import subprocess
 
 import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 EKS = ROOT / 'deploy/eks'
-MINIKUBE = ROOT / 'deploy/minikube'
 MANIFESTS = EKS / 'manifests'
 APPS = EKS / 'applications'
 HUB_NAMESPACE = 'argocd'
@@ -99,10 +97,9 @@ def test_manifest_namespaces_match_their_application():
             assert doc['metadata']['namespace'] == directories[str(path.parent.relative_to(ROOT))], path
 
 
-@pytest.mark.parametrize('base', [EKS, MINIKUBE], ids=['eks', 'minikube'])
-def test_no_duplicate_resource_identities(base):
+def test_no_duplicate_resource_identities():
     seen = set()
-    for path in base.rglob('*.yaml'):
+    for path in EKS.rglob('*.yaml'):
         if 'templates' in path.parts or 'examples' in path.parts:
             continue
         for doc in documents(path):
@@ -174,14 +171,14 @@ def test_eks_workflow_does_not_run_kustomize_on_this_repository():
 
 
 def test_deployment_commands_name_a_context():
-    for path in (EKS / 'DEPLOY.md', ROOT / 'deploy/README.md', MINIKUBE / 'README.md'):
+    for path in (EKS / 'DEPLOY.md', ROOT / 'deploy/README.md'):
         for line in path.read_text().splitlines():
             if re.match(r'\s*kubectl (apply|diff|wait|create|get)\b', line):
                 raise AssertionError((path, line))
 
 
 def test_no_command_applies_a_parent_directory():
-    parents = ('deploy', 'deploy/eks', 'deploy/minikube', 'deploy/eks/manifests')
+    parents = ('deploy', 'deploy/eks', 'deploy/eks/manifests')
     for path in ROOT.joinpath('deploy').rglob('*.md'):
         for line in path.read_text().splitlines():
             if 'kubectl' in line and ' apply ' in line and '`' not in line:
@@ -189,50 +186,8 @@ def test_no_command_applies_a_parent_directory():
                 assert not target or target.group(1).rstrip('/') not in parents, (path, line)
 
 
-def minikube_objects():
-    for path in MINIKUBE.rglob('*.yaml'):
-        if 'templates' in path.parts:
-            continue
-        for doc in documents(path):
-            if isinstance(doc, dict) and 'kind' in doc:
-                yield path, doc
-
-
-def test_minikube_has_no_aws_only_resources():
-    text = re.compile(r'service\.beta\.kubernetes\.io/aws|elbv2\.k8s\.aws|eks\.amazonaws\.com|alb\.ingress\.kubernetes\.io|ebs\.csi|karpenter|\bgp3\b|loadBalancerClass')
-    for path, doc in minikube_objects():
-        assert not text.search(path.read_text()), path
-        assert doc.get('spec', {}).get('ingressClassName') != 'alb' if isinstance(doc.get('spec'), dict) else True, path
-        assert doc['spec'].get('storageClassName') not in ('gp2', 'gp3') if isinstance(doc.get('spec'), dict) else True, path
-
-
-def test_minikube_applications_stay_on_the_local_cluster():
-    for path, doc in minikube_objects():
-        if doc['kind'] == 'Application':
-            assert doc['spec']['destination']['server'] == 'https://kubernetes.default.svc', path
-            assert 'deploy/eks' not in path.read_text(), path
-
-
-def test_old_top_level_directories_are_gone():
-    for name in ('eks-argocd', 'minikube', 'minikube-argocd', 'observability'):
+def test_minikube_moved_to_its_own_repository():
+    # deploy/minikube, minikube-infrastructure, the mk4 scripts and workflows live in mrjithendar/miniKube.
+    for name in ('eks-argocd', 'minikube', 'minikube-argocd', 'observability', 'deploy/minikube', 'minikube-infrastructure',
+                 'scripts/argocd', 'deploy-argocd.sh', 'bootstrap-cluster.sh', 'deploy-minikube.sh'):
         assert not (ROOT / name).exists(), name
-
-
-def test_minikube_issuers_solve_dns01_for_the_wildcard():
-    output = subprocess.check_output(['helm', 'template', 'letsencrypt-jithendar', str(MINIKUBE / 'cert-manager/issuers'),
-                                      '-n', 'cert-manager'], text=True)
-    docs = [d for d in yaml.safe_load_all(output) if d]
-    issuers = {d['metadata']['name']: d for d in docs if d['kind'] == 'ClusterIssuer'}
-    # letsencrypt-prod/-staging (HTTP-01) belong to the jithendar.com repository; these must not collide.
-    assert set(issuers) == {'letsencrypt-dns', 'letsencrypt-dns-staging'}
-    example = documents_example('cloudflare-api-token-secret')
-    # ClusterIssuers read their Secrets from cert-manager's own namespace.
-    assert example['metadata']['namespace'] == 'cert-manager'
-    for issuer in issuers.values():
-        solver = issuer['spec']['acme']['solvers'][0]
-        assert 'http01' not in solver and solver['selector']['dnsZones'] == ['jithendar.com']
-        reference = solver['dns01']['cloudflare']['apiTokenSecretRef']
-        assert reference == {'name': example['metadata']['name'], 'key': 'api-token'}
-    certificate = next(d for d in docs if d['kind'] == 'Certificate')
-    assert certificate['spec']['dnsNames'] == ['jithendar.com', '*.jithendar.com']
-    assert certificate['spec']['issuerRef']['name'] == 'letsencrypt-dns'

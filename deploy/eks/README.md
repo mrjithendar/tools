@@ -8,7 +8,7 @@ mesh mTLS. Argo CD on mk4 manages this cluster as a remote cluster; register it 
 deployed until you follow [RUNBOOK.md](RUNBOOK.md), and the steps there are the first real run. For the deployment commands
 alone, see [DEPLOY.md](DEPLOY.md).
 
-These Applications live here rather than in `deploy/minikube/applications/` because `scripts/argocd/deploy.py` only deploys to the local cluster.
+These Applications live here rather than in the miniKube repository's `deploy/minikube/applications/` because its `scripts/argocd/deploy.py` only deploys to the local cluster.
 Like the mk4 Applications, they do not sync automatically and must never be synced with prune.
 
 ## Layout
@@ -28,8 +28,8 @@ Like the mk4 Applications, they do not sync automatically and must never be sync
 
 Controllers are Argo CD Applications in `applications/`, in project `eks-platform`, with their values in `helm-values/`. Terraform
 keeps only what lives in AWS: the cluster, add-ons, IAM and Pod Identity. EKS has its own cert-manager, the AWS add-on; mk4 has a
-separate one, in `deploy/minikube`.
-Each resource has one owner. Nothing here reads a file from `deploy/minikube`, and `deploy/eks` has no Kustomize: every file in
+separate one, in the miniKube repository.
+Each resource has one owner. Nothing here reads a file from the miniKube repository, and `deploy/eks` has no Kustomize: every file in
 `manifests/` is a complete object with its own namespace, and each Application names a plain directory.
 
 ## How the browser reaches EKS

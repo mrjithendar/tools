@@ -1,5 +1,6 @@
 """The controllers on roboshop-demo are Argo CD Applications; these keep them adoptable and safe to sync."""
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,8 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 APPS = ROOT / 'deploy/eks/applications'
 PLATFORM = ROOT / 'deploy/eks/helm-values'
+sys.path.insert(0, str(ROOT / 'scripts/lib'))
+from repos import MINIKUBE  # noqa: E402  (sibling miniKube checkout: mk4 Grafana dashboards)
 RELEASES = {
     'aws-load-balancer-controller': 'kube-system',
     'istio-base': 'istio-system',
@@ -93,7 +96,10 @@ def test_kube_state_metrics_is_scraped_and_bounded(values, job):
     jobs = load(PLATFORM / values)['serverFiles']['prometheus.yml']['scrape_configs']
     keep = next(j for j in jobs if j['job_name'] == job)['metric_relabel_configs'][0]
     assert keep['action'] == 'keep' and keep['source_labels'] == ['__name__']
-    dashboards = ''.join(p.read_text() for p in (ROOT / 'deploy/minikube/observability/grafana/dashboards').glob('*.json'))
+    directory = MINIKUBE / 'deploy/minikube/observability/grafana/dashboards'
+    if not directory.is_dir():
+        pytest.skip(f'{directory} not found: clone mrjithendar/miniKube beside tools or set MINIKUBE_DIR')
+    dashboards = ''.join(p.read_text() for p in directory.glob('*.json'))
     for metric in set(re.findall(r'\bkube_[a-z0-9_]+', dashboards)) - {'kube_namespaces', 'kube_identity'}:
         assert re.fullmatch(keep['regex'], metric), metric
 

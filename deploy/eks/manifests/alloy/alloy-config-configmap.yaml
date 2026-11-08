@@ -1,5 +1,5 @@
 # Applied as plain YAML, so the {{ }} below are Alloy templates, not Helm. tests/test_loki.py keeps this equal to mk4's
-# deploy/minikube/observability/loki/config.alloy apart from the destination, so the same fields are dropped on both clusters.
+# config in the miniKube repository, deploy/minikube/observability/loki/config.alloy apart from the destination, so the same fields are dropped on both clusters.
 apiVersion: v1
 kind: ConfigMap
 metadata:

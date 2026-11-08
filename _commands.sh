@@ -9,7 +9,7 @@ kubectl --context roboshop-demo -n monitoring create secret generic prometheus-r
   --from-literal=password="$PASS"
 unset PASS
 
-./deploy-argocd.sh prometheus --context mk4
+../miniKube/deploy-argocd.sh prometheus --context mk4
 
 terraform -chdir=infrastructure import -var-file=vars/terraform.tfvars \
   'aws_networkflowmonitor_scope.main[0]' \

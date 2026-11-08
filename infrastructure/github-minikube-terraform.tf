@@ -1,5 +1,5 @@
-# Role .github/workflows/create-mk-infrastructure.yml assumes through GitHub OIDC to read and write the
-# minikube-infrastructure/ state. Only jobs in this repository's GitHub environment "mk4" can assume it
+# Role that the miniKube repository's .github/workflows/create-mk-infrastructure.yml assumes through GitHub OIDC to read and write the
+# minikube-infrastructure/ state (both now in mrjithendar/miniKube). Only jobs in that repository's GitHub environment "mk4" can assume it
 # (that environment allows master only), and it reaches nothing but that one state object and its lock.
 # The GitHub OIDC provider already exists in the account; its ARN is fixed, so it is built, not looked up.
 locals {
@@ -9,7 +9,7 @@ locals {
 
 resource "aws_iam_role" "github_minikube_terraform" {
   name                 = "github-tools-minikube-terraform"
-  description          = "GitHub Actions (mrjithendar/tools, environment mk4): minikube-infrastructure state only"
+  description          = "GitHub Actions (mrjithendar/miniKube, environment mk4): minikube-infrastructure state only"
   max_session_duration = 3600
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -20,7 +20,7 @@ resource "aws_iam_role" "github_minikube_terraform" {
       Condition = {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          "token.actions.githubusercontent.com:sub" = "repo:mrjithendar/tools:environment:mk4"
+          "token.actions.githubusercontent.com:sub" = "repo:mrjithendar/miniKube:environment:mk4"
         }
       }
     }]

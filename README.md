@@ -1,8 +1,8 @@
 # tools
 
 - **[labauto](#labauto)**: one-command installers for DevOps tools (`labauto.sh`, `devops-tools/`).
-- **[Cluster tooling](#cluster-tooling)**: the Minikube cluster, ingress/TLS, platform services
-  and observability that [roboshop-ai](https://github.com/mrjithendar/roboshop-ai) runs on.
+- **[Cluster tooling](#cluster-tooling)**: AWS Terraform and the EKS deployment files. The Minikube cluster
+  `mk4` is in [miniKube](https://github.com/mrjithendar/miniKube).
 
 ## labauto
 
@@ -22,93 +22,51 @@ the menu automatically.
 
 ## Cluster tooling
 
-### Quick start
+The Minikube cluster `mk4` moved to its own repository, [mrjithendar/miniKube](https://github.com/mrjithendar/miniKube),
+on 2026-11-08, with the same paths: `deploy/minikube/`, `minikube-infrastructure/`, `scripts/argocd/`, the root
+wrappers (`deploy-minikube.sh`, `bootstrap-cluster.sh`, `deploy-argocd.sh`, `create-secrets.sh`,
+`harbor-pull-secret.sh`) and the workflows `check-mk-infrastructure.yml`, `create-mk-infrastructure.yml` and
+`build-harbor-images.yml`. Its quick start is in that repository's README.
 
-```bash
-./init.sh --profile minikube     # host prerequisites: Docker, kubectl, Helm, Minikube
-./deploy-minikube.sh             # create the cluster
-./bootstrap-cluster.sh           # Traefik, Argo CD, ECR pull secrets
-terraform -chdir=minikube-infrastructure apply -var-file=vars/mk4.tfvars   # cert-manager, Istio, Kiali, monitoring (minikube-infrastructure/README.md)
-./create-secrets.sh --apply      # missing installation credentials
-./deploy-argocd.sh roboshop      # register and sync the RoboShop applications
-```
+This repository keeps:
 
-EKS has no script here: it is deployed through Argo CD from plain YAML. See [deploy/README.md](deploy/README.md).
-
-Every entry point can run from any directory, and most accept `--help`.
-
-| Command | Does |
+| Command or path | Does |
 |---|---|
-| `./init.sh [--profile dev\|docker\|minikube\|aws] [--check]` | Install host prerequisites. No cluster or cloud changes. |
-| `./deploy-minikube.sh` | Create or update the Minikube cluster (`deploy/minikube/install.sh`). |
-| `./bootstrap-cluster.sh` | Install Traefik with Helm, then Argo CD and its ingress; refresh ECR pull secrets. `--schedule-pull-secrets` adds a six-hourly refresh CronJob ([details](deploy/minikube/ecr-refresh/README.md)). |
-| `./create-secrets.sh [--apply] [--all]` | Create missing installation credentials. Never rotates existing ones. |
-| `./deploy-argocd.sh [app\|all\|roboshop\|list\|status]` | Register and sync Argo CD Applications. |
-| `./deploy-traefik.sh` | Install or upgrade Traefik on its own (`deploy/minikube/deploy-traefik.sh`). |
-
-Less common operations in `deploy/minikube/`:
-
-| Script | Does |
-|---|---|
-| `kubeconfig.sh` | Copy the remote cluster's kubeconfig over SSH and validate it. |
-| `tunnel-endpoint.sh` | SSH-forward the Kubernetes API when it is not directly reachable. |
-| `expose-ingress.sh` | Forward host ports 80/443 to the Minikube ingress. |
-| `host-limits.sh` | Raise Linux inotify limits (run automatically by `install.sh`). |
-| `deploy-vault.sh` | Install persistent Vault with Helm ([details](deploy/minikube/vault/README.md)). |
-| `reset.sh` | **Destructive**: delete the Minikube clusters and installer state. Asks for confirmation. |
-
-### Layout
-
-| Path | Contents |
-|---|---|
-| `deploy/` | Kubernetes deployment files, one directory per environment. Read [deploy/README.md](deploy/README.md) first. |
-| `deploy/minikube/` | Cluster scripts and per-component config: [argocd](deploy/minikube/argocd/README.md), [cert-manager](deploy/minikube/cert-manager/README.md), [traefik](deploy/minikube/traefik/README.md), [vault](deploy/minikube/vault/README.md), [jfrog](deploy/minikube/jfrog/README.md), [metrics-server](deploy/minikube/metrics-server/README.md), [ecr-refresh](deploy/minikube/ecr-refresh/README.md), `namespaces/`, the [Argo CD catalog](deploy/minikube/applications/README.md) and [observability](deploy/minikube/observability/README.md) (Prometheus, Grafana, Loki/Alloy, OpenTelemetry collector, Jaeger). [Commands](deploy/minikube/README.md). |
-| `infrastructure/` | Terraform for the lab AWS account: VPC, ECR, SES, Bedrock role, the `roboshop-demo` EKS cluster and its add-ons ([details](infrastructure/README.md)). |
-| `deploy/eks/` | EKS Applications, plain manifests and Helm values for the controllers, ingress and mTLS: [commands](deploy/eks/DEPLOY.md), [runbook](deploy/eks/RUNBOOK.md), [design](deploy/eks/README.md). |
-| `scripts/argocd/` | `bootstrap.py`, `deploy.py`, and `validate.py` (renders the whole catalog and checks ownership). |
-| `scripts/setup/` | Host initialization (`initialize.py`, pinned `versions.json`) and secrets ([SECRETS.md](scripts/setup/SECRETS.md)). |
-| `scripts/data/` | `generate-secrets.py` (local credential files), `seed-minikube-demo.py` (opt-in demo data). |
-| `scripts/maintenance/` | `delete-branches.sh` (stale Dependabot branches), `squash-history.py` ([notes](scripts/maintenance/squash-history.md)), `reset-test-checkout.py`. |
-| `scripts/lib/` | Shared helpers: supported-host check, Argo CD ownership check, repository paths. |
-| `tests/`, `deploy/minikube/test-*.py` | Tests for everything above. |
+| `./init.sh [--profile dev\|docker\|minikube\|aws] [--check]` | Install host prerequisites. No cluster or cloud changes. miniKube's `deploy-minikube.sh install` calls it from a sibling checkout. |
+| `infrastructure/` | Terraform for the lab AWS account: VPC, ECR, SES, Bedrock role, the `roboshop-demo` EKS cluster and its add-ons, and the OIDC role miniKube's Terraform workflow uses for its state ([details](infrastructure/README.md)). |
+| `deploy/eks/` | EKS Applications, plain manifests and Helm values for the controllers, ingress and mTLS: [commands](deploy/eks/DEPLOY.md), [runbook](deploy/eks/RUNBOOK.md), [design](deploy/eks/README.md). Read [deploy/README.md](deploy/README.md) first. |
+| `runner/` | Self-hosted GitHub runner setup for the AWS Terraform workflow ([details](runner/README.md)). |
+| `scripts/setup/` | Host initialization (`initialize.py`, pinned `versions.json`). |
+| `scripts/data/` | `generate-secrets.py` (local credential files). |
+| `scripts/maintenance/` | `delete-branches.sh` (stale Dependabot branches), `squash-history.py` ([notes](scripts/maintenance/squash-history.md)), `reset-test-checkout.py`, `clear-runner-logs.sh`. |
+| `scripts/lib/` | Shared helpers: supported-host check, repository paths. |
+| `tests/` | Tests for everything above. |
 
 Supported hosts: CentOS Stream 9/10, Amazon Linux 2023, Ubuntu 22.04/24.04, and macOS for
 client-side commands. x86_64 and ARM64 only.
 
-### Working with roboshop-ai
+### Working with the other repositories
 
 The shop's Argo CD catalog, the microservices, their manifests and the operations docs live in
-roboshop-ai; `deploy/minikube/applications/` here holds the monitoring stack's catalog. Its Applications read `deploy/minikube/*` and
-`deploy/minikube/observability/*` from this repository. The shared jithendar.com certificate, the default
-Traefik TLSStore and `patch-ssl.sh` live in
-[jithendar.com](https://github.com/mrjithendar/jithendar.com). Clone all three side by side,
-or set `ROBOSHOP_AI_DIR` / `JITHENDAR_COM_DIR`:
+roboshop-ai. The shared jithendar.com certificate and `patch-ssl.sh` live in
+[jithendar.com](https://github.com/mrjithendar/jithendar.com). Clone them side by side, or set `ROBOSHOP_AI_DIR` /
+`JITHENDAR_COM_DIR` / `MINIKUBE_DIR`:
 
 ```text
 Work/
+  miniKube/
   roboshop-ai/
   jithendar.com/
   tools/
 ```
 
-Argo CD deploys the **pushed** revision of `master`. Commit and push changes here before running
-`./deploy-argocd.sh`.
-
 ### Tests
 
-Needs Python 3.9+ with `pytest` and `PyYAML`, and the roboshop-ai and jithendar.com checkouts.
+Needs Python 3.9+ with `pytest` and `PyYAML`, and the roboshop-ai checkout. Two tests compare EKS with mk4 and read
+`../miniKube`; they skip without it.
 
 ```bash
-python3 scripts/argocd/validate.py
-python3 -m pytest -q tests deploy/minikube/test-*.py
-```
-
-The Vault chart test runs only against a rendered chart:
-
-```bash
-helm template vault vault --repo https://helm.releases.hashicorp.com --version 0.34.1 \
-  -f deploy/minikube/vault/values.yaml > /tmp/vault.yaml
-python3 tests/test_vault_chart.py /tmp/vault.yaml
+python3 -m pytest -q tests
 ```
 
 ## License

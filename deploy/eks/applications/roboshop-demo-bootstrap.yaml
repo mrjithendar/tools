@@ -1,4 +1,4 @@
-# Lives outside deploy/minikube/applications because scripts/argocd/deploy.py only deploys to the local cluster: a remote
+# Lives outside miniKube's deploy/minikube/applications because its scripts/argocd/deploy.py only deploys to the local cluster: a remote
 # destination in that catalog would fail `./deploy-argocd.sh all`. Apply it with kubectl; see deploy/eks/DEPLOY.md.
 apiVersion: argoproj.io/v1alpha1
 kind: Application

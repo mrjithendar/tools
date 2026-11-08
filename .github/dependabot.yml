@@ -1,14 +1,12 @@
 # Dependabot version updates. Pull requests run check-aws-infrastructure.yml (Terraform fmt, validate and
-# mock tests). Merging an infrastructure/ change to master applies it through create-aws-infrastructure.yml;
-# merging an image bump changes nothing until the Argo CD Application is synced.
+# mock tests). Merging an infrastructure/ change to master applies it through create-aws-infrastructure.yml.
 #
 # Minor and patch updates are grouped to keep the PR count down; majors arrive one PR each.
 # Security updates are not grouped and are not held back by the cooldown.
 #
-# Not covered, because Dependabot cannot read them; bump these by hand: Helm chart versions in deploy/minikube/applications/*.yaml,
-# scripts/argocd/ and deploy/minikube/deploy-*.sh, the host tools in scripts/setup/versions.json, terraform_version
-# in the workflows, and the Vault image (deploy/minikube/vault/values.yaml has no Chart.yaml, and
-# tests/test_vault_chart.py pins it).
+# Not covered, because Dependabot cannot read them; bump these by hand: the host tools in scripts/setup/versions.json,
+# terraform_version in the workflows, and the chart versions in deploy/eks/applications/*.yaml.
+# The Minikube images and charts are updated by the miniKube repository's own Dependabot.
 
 version: 2
 
@@ -25,45 +23,6 @@ updates:
       default-days: 3
     commit-message:
       prefix: "deps(terraform)"
-
-  # Images in the Kubernetes manifests. deploy/minikube/observability/jaeger and deploy/minikube/observability/otel-collector are left
-  # out: no Argo CD Application deploys them.
-  - package-ecosystem: docker
-    directories:
-      - /deploy/minikube/ecr-refresh
-      - /deploy/minikube/observability/loki
-    schedule:
-      interval: weekly
-      day: monday
-      time: "06:00"
-      timezone: America/New_York
-    cooldown:
-      default-days: 3
-    commit-message:
-      prefix: "deps(k8s)"
-    groups:
-      images-minor-patch:
-        update-types: [minor, patch]
-    ignore:
-      # MongoDB feature versions upgrade one step at a time and change the on-disk format.
-      - dependency-name: mongo
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
-
-  # Images in the local Prometheus chart values (prometheus, busybox)
-  - package-ecosystem: helm
-    directory: /deploy/minikube/observability/prometheus
-    schedule:
-      interval: weekly
-      day: monday
-      time: "06:00"
-      timezone: America/New_York
-    cooldown:
-      default-days: 3
-    commit-message:
-      prefix: "deps(helm)"
-    groups:
-      helm-minor-patch:
-        update-types: [minor, patch]
 
   # Actions in .github/workflows (pinned by commit SHA; Dependabot updates the SHA and the comment)
   - package-ecosystem: github-actions
