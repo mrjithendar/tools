@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time: gives .github/workflows/minikube-terraform-apply.yml access to mk4 and to its Terraform state.
+# One-time: gives .github/workflows/create-mk-infrastructure.yml access to mk4 and to its Terraform state.
 #   1. applies minikube-infrastructure/ci/github-terraform-serviceaccount.yaml (cluster-admin ServiceAccount + token);
 #   2. creates the GitHub environment "mk4", deployable from master only;
 #   3. stores what the workflow needs:

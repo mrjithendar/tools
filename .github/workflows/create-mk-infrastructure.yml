@@ -2,7 +2,7 @@ name: Deploy minikube infrastructure
 
 # Applies minikube-infrastructure/ (Helm releases on mk4: metrics-server, cert-manager, Let's Encrypt, Istio, Kiali,
 # Prometheus, Grafana, Loki, OpenTelemetry Collector, Jaeger) on pushes to master, or by hand with "plan only" to see
-# drift. Pull requests are checked by minikube-terraform-check.yml.
+# drift. Pull requests are checked by check-mk-infrastructure.yml.
 # Off until repository variable MINIKUBE_TERRAFORM_APPLY is "true": set it after the one-time move of the live add-ons
 # off Argo CD (minikube-infrastructure/README.md), never before.
 #
@@ -28,7 +28,7 @@ on:
       - 'deploy/minikube/istio/**'
       - 'deploy/minikube/observability/**'
       - '.github/mk4-terraform-kubeconfig.yaml'
-      - '.github/workflows/minikube-terraform-apply.yml'
+      - '.github/workflows/create-mk-infrastructure.yml'
 
 permissions:
   contents: read

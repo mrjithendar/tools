@@ -1,4 +1,4 @@
-# Role .github/workflows/minikube-terraform-apply.yml assumes through GitHub OIDC to read and write the
+# Role .github/workflows/create-mk-infrastructure.yml assumes through GitHub OIDC to read and write the
 # minikube-infrastructure/ state. Only jobs in this repository's GitHub environment "mk4" can assume it
 # (that environment allows master only), and it reaches nothing but that one state object and its lock.
 # The GitHub OIDC provider already exists in the account; its ARN is fixed, so it is built, not looked up.

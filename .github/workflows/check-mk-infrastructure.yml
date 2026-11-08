@@ -12,7 +12,7 @@ on:
       - 'deploy/minikube/istio/**'
       - 'deploy/minikube/observability/**'
       - '.github/mk4-terraform-kubeconfig.yaml'
-      - '.github/workflows/minikube-terraform-*.yml'
+      - '.github/workflows/*-mk-infrastructure.yml'
 
 permissions:
   contents: read

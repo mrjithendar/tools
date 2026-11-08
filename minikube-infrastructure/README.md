@@ -82,8 +82,8 @@ Argo CD), then this root.
 
 | Workflow | When | Runner | Does |
 |---|---|---|---|
-| `.github/workflows/minikube-terraform-check.yml` | pull requests touching this folder, `deploy/minikube/{cert-manager,istio,observability}`, the metrics-server values | GitHub-hosted, no secrets | fmt, validate, `terraform test`, `helm lint`/`template` of every local chart |
-| `.github/workflows/minikube-terraform-apply.yml` ("Deploy minikube infrastructure") | push to `master` (same paths), or by hand (`plan_only` to see drift) | GitHub-hosted, environment `mk4` | prerequisite checks (Traefik CRDs, no leftover Argo CD apps, Cloudflare Secret), fmt, validate, test, plan (in the run summary), apply, then checks all 12 releases are `deployed` and /grafana, /prometheus, /kiali answer |
+| `.github/workflows/check-mk-infrastructure.yml` | pull requests touching this folder, `deploy/minikube/{cert-manager,istio,observability}`, the metrics-server values | GitHub-hosted, no secrets | fmt, validate, `terraform test`, `helm lint`/`template` of every local chart |
+| `.github/workflows/create-mk-infrastructure.yml` ("Deploy minikube infrastructure") | push to `master` (same paths), or by hand (`plan_only` to see drift) | GitHub-hosted, environment `mk4` | prerequisite checks (Traefik CRDs, no leftover Argo CD apps, Cloudflare Secret), fmt, validate, test, plan (in the run summary), apply, then checks all 12 releases are `deployed` and /grafana, /prometheus, /kiali answer |
 
 Both check out `tools` and `jithendar.com` (public, `grafana/` only) side by side, so `jithendar_com_dir` keeps its
 default. A dashboard change in jithendar.com does not trigger the deploy; run it by hand.
@@ -100,13 +100,13 @@ The deploy job runs only when repository variable `MINIKUBE_TERRAFORM_APPLY` is 
 
 Turning it on (once):
 
-1. Merge to `master`. `create-infrastructure.yml` applies `infrastructure/` and creates the role.
+1. Merge to `master`. `create-aws-infrastructure.yml` applies `infrastructure/` and creates the role.
 2. `scripts/setup-minikube-terraform-ci.sh`: applies the ServiceAccount, checks the rendered kubeconfig can do what the
    releases need, creates the environment `mk4` (master only), stores the token and the variables `MK4_API_SERVER`,
    `MK4_CA_DATA`, `MK4_TERRAFORM_ROLE_ARN`. Needs `gh` signed in with admin on the repository.
 3. The move below, steps 1–6 (by hand, once). Step 6 can instead be the first CI run: do steps 1–5, then step 4 here.
 4. `gh variable set MINIKUBE_TERRAFORM_APPLY --repo mrjithendar/tools --body true`, then
-   `gh workflow run minikube-terraform-apply.yml --repo mrjithendar/tools -f plan_only=true` and read the plan in the
+   `gh workflow run create-mk-infrastructure.yml --repo mrjithendar/tools -f plan_only=true` and read the plan in the
    run summary before the first real apply.
 
 ## Moving the live mk4 add-ons from Argo CD (once)

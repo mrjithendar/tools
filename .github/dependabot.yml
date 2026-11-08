@@ -1,5 +1,5 @@
-# Dependabot version updates. Pull requests run check-infrastructure.yml (Terraform fmt, validate and
-# mock tests). Merging an infrastructure/ change to master applies it through create-infrastructure.yml;
+# Dependabot version updates. Pull requests run check-aws-infrastructure.yml (Terraform fmt, validate and
+# mock tests). Merging an infrastructure/ change to master applies it through create-aws-infrastructure.yml;
 # merging an image bump changes nothing until the Argo CD Application is synced.
 #
 # Minor and patch updates are grouped to keep the PR count down; majors arrive one PR each.

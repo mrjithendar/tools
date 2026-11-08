@@ -68,7 +68,7 @@ apply pipeline against untrusted pull-request code. Mock tests do not access AWS
 
 ## GitHub Actions deployment
 
-The [Create infrastructure workflow](../.github/workflows/create-infrastructure.yml)
+The [Create infrastructure workflow](../.github/workflows/create-aws-infrastructure.yml)
 runs on every push to `master` that touches `infrastructure/`, or manually, on the self-hosted runner. It checks formatting, initializes remote
 state, validates and tests the configuration, then creates and applies a saved
 plan using `vars/terraform.tfvars`. It provisions VPC/ECR/SES, not clusters or application
