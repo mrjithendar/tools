@@ -2,7 +2,7 @@ environment = "demo"
 userid      = "JDHARMAPURI"
 aws_region  = "us-east-1"
 # False destroys the VPC, subnets, NAT gateways and routes (EKS must be off first).
-vpc_enabled        = true
+vpc_enabled        = false
 vpc_cidr           = "10.0.0.0/16"
 availability_zones = ["us-east-1a", "us-east-1b"]
 # False = one NAT per AZ. True reduces demo costs but makes egress depend on one AZ.
